@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Onde Caçar · ajudante do PokeIdle</title>
+<meta name="description" content="Extensão gratuita e não oficial do PokeIdle: melhores hunts para o seu pokémon, poção e pokébola certas, sessão ao vivo, progresso e avisos.">
+<meta property="og:title" content="Onde Caçar: ajudante não oficial do PokeIdle">
+<meta property="og:description" content="Descubra onde vale a pena caçar agora, e com o quê.">
+<meta property="og:image" content="https://paulozy.github.io/onde-cacar/loja/marquee-1400x560.png">
+<link rel="icon" href="icons/48.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@500;600;700&family=Barlow+Condensed:wght@700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --vinho-fundo: #3a1622;
+    --vinho: #722c3f;
+    --vinho-claro: #914850;
+    --madeira: #bd6951;
+    --contorno: #480e1e;
+    --ouro: #d09a17;
+    --ouro-claro: #ffe9a8;
+    --creme: #fff6ef;
+    --creme-suave: #f5cdb9;
+    --carvao: #33202b;
+    --tinta: #1b0d12;
+    --display: "Barlow Condensed", "Barlow", sans-serif;
+    --texto: "Barlow", "Segoe UI", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+  body {
+    margin: 0; color: var(--creme); font: 500 17px/1.55 var(--texto);
+    background-color: var(--vinho-fundo);
+    background-image:
+      repeating-linear-gradient(90deg, rgba(0,0,0,.06) 0 2px, transparent 2px 120px),
+      radial-gradient(120% 70% at 70% 0%, #5a2333 0%, var(--vinho-fundo) 60%);
+  }
+  a { color: var(--ouro-claro); }
+  a:focus-visible, button:focus-visible { outline: 3px solid var(--ouro-claro); outline-offset: 3px; }
+  .miolo { width: min(1120px, 100% - 32px); margin-inline: auto; }
+
+  /* Cabeçalho */
+  .topo { display: flex; align-items: center; gap: 12px; padding: 18px 0; }
+  .topo img { width: 40px; height: 40px; image-rendering: pixelated; }
+  .topo strong { font: 800 22px/1 var(--display); letter-spacing: .01em; flex: 1; }
+  .topo a { color: var(--creme-suave); font-weight: 600; text-decoration: none; }
+  .topo a:hover { color: var(--creme); text-decoration: underline; }
+
+  /* Botões no estilo do botão dourado do jogo */
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px; padding: 12px 20px; border-radius: 8px;
+    text-decoration: none; color: var(--tinta); font: 700 16px/1.2 var(--texto);
+    background: linear-gradient(180deg, var(--ouro-claro) 0 5px, var(--ouro) 5px 100%);
+    box-shadow: inset 0 0 0 2px var(--contorno), 0 2px 0 #e7a86d;
+    text-shadow: 0 1px 0 rgba(255,255,255,.35);
+  }
+  .btn:hover { filter: brightness(1.07); }
+  .btn-escuro { color: var(--creme); background: var(--carvao); text-shadow: none; box-shadow: inset 0 0 0 2px var(--contorno), 0 2px 0 #5a2a34; }
+  .btn small { font-weight: 600; opacity: .75; }
+
+  /* Hero */
+  .hero { display: grid; grid-template-columns: 1fr 1.1fr; gap: 56px; align-items: center; padding: 48px 0 88px; }
+  .hero h1 { margin: 0 0 20px; font: 800 clamp(48px, 7.2vw, 92px)/.92 var(--display); letter-spacing: -.01em; text-wrap: balance; }
+  .hero h1 span { display: block; color: var(--ouro-claro); }
+  .hero p.lead { margin: 0 0 28px; max-width: 34em; color: var(--creme-suave); font-size: 19px; }
+  .baixar { display: flex; flex-wrap: wrap; gap: 12px; }
+  .versao { margin-top: 14px; font-size: 14px; color: var(--creme-suave); }
+
+  /* Réplica do painel da extensão */
+  .painel {
+    position: relative; border-radius: 12px; padding: 14px 16px 18px; color: var(--creme);
+    font: 500 14px/1.4 var(--texto);
+    background: linear-gradient(180deg, var(--vinho-claro) 0 12px, var(--madeira) 12px calc(100% - 12px), var(--vinho) calc(100% - 12px));
+    box-shadow: inset 0 0 0 2px var(--contorno), inset 0 3px 0 #f1d3b7, 0 24px 60px rgba(0,0,0,.45);
+    transform: rotate(1.2deg);
+  }
+  .painel-cab { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .painel-cab div { flex: 1; }
+  .painel-cab h2 { margin: 0; font: 800 19px/1.1 var(--texto); }
+  .painel-cab small { color: var(--creme-suave); font-weight: 600; font-size: 13px; }
+  .painel-cab .x { width: 28px; height: 28px; border-radius: 6px; display: grid; place-items: center; background: var(--carvao); box-shadow: inset 0 0 0 2px var(--contorno); font-weight: 800; }
+  .abas { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 10px; }
+  .abas button {
+    border: 0; border-radius: 6px 6px 0 0; padding: 8px 13px; cursor: pointer;
+    font: 700 14px/1 var(--texto); color: var(--creme-suave); background: var(--carvao);
+  }
+  .abas button[aria-selected="true"] { color: var(--tinta); background: linear-gradient(180deg, var(--ouro-claro) 0 3px, var(--ouro) 3px 100%); }
+  .conteudo { min-height: 300px; }
+  .veredito {
+    border-radius: 8px; padding: 14px 16px; color: var(--tinta);
+    background: linear-gradient(180deg, var(--ouro-claro) 0 5px, #e3b13a 5px 100%);
+    box-shadow: inset 0 0 0 2px var(--contorno);
+  }
+  .veredito .rot { font-weight: 700; font-size: 13px; opacity: .8; }
+  .veredito .nome { display: block; font: 800 40px/1 var(--display); margin: 2px 0 4px; }
+  .nums { display: flex; flex-wrap: wrap; gap: 6px 24px; margin-top: 10px; }
+  .nums b { display: block; font: 800 22px/1 var(--display); }
+  .nums span { font-size: 12.5px; font-weight: 600; opacity: .8; }
+  .tabela { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13.5px; }
+  .tabela th { text-align: left; font-weight: 700; color: var(--creme-suave); padding: 6px 8px; }
+  .tabela td { padding: 7px 8px; background: rgba(51,32,43,.55); }
+  .tabela tr td:first-child { border-radius: 6px 0 0 6px; }
+  .tabela tr td:last-child { border-radius: 0 6px 6px 0; }
+  .tabela td.n { text-align: right; font-variant-numeric: tabular-nums; }
+  .tabela th.n { text-align: right; }
+  .tabela { border-spacing: 0 4px; border-collapse: separate; }
+  .barra { height: 12px; border-radius: 6px; background: var(--carvao); box-shadow: inset 0 0 0 2px var(--contorno); overflow: hidden; margin: 6px 0 14px; }
+  .barra i { display: block; height: 100%; background: linear-gradient(180deg, var(--ouro-claro) 0 3px, var(--ouro) 3px); }
+  .linha { display: flex; justify-content: space-between; gap: 12px; font-weight: 600; }
+  .nota { margin: 10px 0 0; font-size: 12.5px; color: var(--creme-suave); }
+  .ilustr { position: absolute; right: 14px; bottom: -28px; font-size: 13px; color: var(--creme-suave); transform: rotate(-1.2deg); }
+
+  .entra { animation: entra .7s cubic-bezier(.2,.8,.2,1) .15s both; }
+  @keyframes entra { from { opacity: 0; transform: translateY(24px) rotate(4deg); } }
+  @media (prefers-reduced-motion: reduce) { .entra { animation: none; } }
+
+  /* Seções */
+  section.bloco { padding: 72px 0; border-top: 2px solid rgba(72,14,30,.9); box-shadow: inset 0 2px 0 rgba(241,211,183,.08); }
+  .bloco h2 { margin: 0 0 12px; font: 800 clamp(34px, 4.5vw, 52px)/1 var(--display); }
+  .bloco > .miolo > p { max-width: 40em; color: var(--creme-suave); margin: 0 0 32px; }
+  .duas { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; }
+  .duas h3 { margin: 0 0 8px; font: 700 26px/1.1 var(--display); color: var(--ouro-claro); }
+  .duas p, .duas li { color: var(--creme-suave); }
+  .duas ul { padding-left: 20px; margin: 0; }
+  .duas li { margin-bottom: 6px; }
+  .duas li::marker { color: var(--ouro); }
+
+  .passos { counter-reset: p; list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 28px 32px; }
+  .passos li { counter-increment: p; position: relative; padding-left: 52px; color: var(--creme-suave); }
+  .passos li::before {
+    content: counter(p); position: absolute; left: 0; top: -2px; width: 38px; height: 38px; border-radius: 50%;
+    display: grid; place-items: center; font: 800 20px/1 var(--display); color: var(--tinta);
+    background: linear-gradient(180deg, var(--ouro-claro) 0 4px, var(--ouro) 4px); box-shadow: inset 0 0 0 2px var(--contorno);
+  }
+  .passos strong { display: block; color: var(--creme); font-size: 18px; }
+  code { font-family: ui-monospace, Consolas, monospace; font-size: .9em; background: var(--carvao); color: var(--creme); padding: 1px 6px; border-radius: 4px; }
+  .bloco .firefox { margin: 36px 0 0; color: var(--creme-suave); max-width: 46em; }
+
+  .selo { display: flex; gap: 20px; align-items: flex-start; }
+  .selo p { max-width: 40em; }
+  .selo svg { flex: none; }
+
+  footer { padding: 36px 0 48px; color: var(--creme-suave); font-size: 14px; border-top: 2px solid rgba(72,14,30,.9); }
+  footer p { margin: 0 0 6px; max-width: 60em; }
+
+  @media (max-width: 860px) {
+    .hero { grid-template-columns: 1fr; gap: 56px; padding-top: 24px; }
+    .painel { transform: none; }
+    .ilustr { transform: none; }
+    .duas { grid-template-columns: 1fr; gap: 32px; }
+    .topo nav a:not(:last-child) { display: none; }
+  }
+  @media (max-width: 480px) {
+    .abas button { padding: 7px 9px; font-size: 13px; }
+    .tabela .opc { display: none; }
+    .veredito .nome { font-size: 34px; }
+  }
+</style>
+</head>
+<body>
+<header class="miolo topo">
+  <img src="icons/48.png" alt="" width="40" height="40">
+  <strong>Onde Caçar</strong>
+  <nav style="display:flex;gap:20px">
+    <a href="#instalar">Instalar</a>
+    <a href="https://github.com/paulozy/onde-cacar">Código no GitHub</a>
+  </nav>
+</header>
+
+<main>
+  <div class="miolo hero">
+    <div>
+      <h1>Onde caçar agora, <span>e com o quê.</span></h1>
+      <p class="lead">Uma extensão gratuita para quem joga PokeIdle. Ela simula o seu pokémon em campo em todas as hunts liberadas e mostra a que rende mais XP, a poção e a pokébola certas e quanto levar na mochila.</p>
+      <div class="baixar">
+        <a class="btn" href="https://github.com/paulozy/onde-cacar/releases/download/v2.1.0/onde-cacar-2.1.0-chrome-edge-opera.zip">Baixar para Chrome, Edge e Opera</a>
+        <a class="btn btn-escuro" href="https://github.com/paulozy/onde-cacar/releases/download/v2.1.0/onde-cacar-2.1.0-firefox.zip">Baixar para Firefox</a>
+      </div>
+      <p class="versao">Versão 2.1.0. <a href="https://github.com/paulozy/onde-cacar/releases">Todas as versões</a></p>
+    </div>
+
+    <div class="painel entra" aria-label="Exemplo do painel da extensão">
+      <div class="painel-cab">
+        <div>
+          <h2>Onde caçar</h2>
+          <small>Quilava · nível 142 · em campo</small>
+        </div>
+        <span class="x" aria-hidden="true">×</span>
+      </div>
+      <div class="abas" role="tablist" aria-label="Abas do painel">
+        <button role="tab" aria-selected="true" aria-controls="aba-conteudo" data-aba="hunts">Hunts</button>
+        <button role="tab" aria-selected="false" aria-controls="aba-conteudo" data-aba="setup" tabindex="-1">Setup</button>
+        <button role="tab" aria-selected="false" aria-controls="aba-conteudo" data-aba="sessao" tabindex="-1">Sessão</button>
+        <button role="tab" aria-selected="false" aria-controls="aba-conteudo" data-aba="progresso" tabindex="-1">Progresso</button>
+      </div>
+      <div id="aba-conteudo" class="conteudo" role="tabpanel"></div>
+      <span class="ilustr">Valores ilustrativos</span>
+    </div>
+  </div>
+
+  <section class="bloco">
+    <div class="miolo">
+      <h2>Ele lê o jogo, você só joga</h2>
+      <p>Os números saem do que o pokeidle.io já carrega na sua tela: seu pokémon e os golpes montados, o catálogo de loot, XP e ouro por abate. A cada F5, ele usa a versão que está no ar.</p>
+      <div class="duas">
+        <div>
+          <h3>Avisos quando importa</h3>
+          <p>Notificação do navegador, com bip opcional, para:</p>
+          <ul>
+            <li>captura boa: potência, qualidade, IV acima do que você escolher, ou shiny</li>
+            <li>drop raro e boss derrotado</li>
+            <li>hunt melhor liberada</li>
+            <li>estoque de poção ou pokébola acabando</li>
+            <li>equipe inteira caída</li>
+          </ul>
+        </div>
+        <div>
+          <h3>Automação, só se você ligar</h3>
+          <p>Vem desligada. Ligada, ela repõe poção e pokébola na loja do NPC e troca de hunt quando aparece uma que rende 10% mais XP/h. Ela só aperta os mesmos botões que você apertaria, e tem travas:</p>
+          <ul>
+            <li>reserva mínima de ouro e gasto máximo por hora</li>
+            <li>uma ação a cada 2,5 segundos</li>
+            <li>troca de área só fora de combate</li>
+            <li>registro de tudo o que fez, em Ajustes</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="bloco" id="instalar">
+    <div class="miolo">
+      <h2>Como instalar</h2>
+      <p>Enquanto a extensão não chega às lojas, a instalação é manual e leva um minuto.</p>
+      <ol class="passos">
+        <li><strong>Baixe e descompacte</strong>Baixe o zip do seu navegador e descompacte numa pasta que você não vá apagar.</li>
+        <li><strong>Abra as extensões</strong><code>chrome://extensions</code> no Chrome ou <code>edge://extensions</code> no Edge.</li>
+        <li><strong>Ligue o modo do desenvolvedor</strong>A chave fica no canto da página de extensões.</li>
+        <li><strong>Carregue a pasta</strong>Clique em <em>Carregar sem compactação</em>, escolha a pasta e recarregue o pokeidle.io.</li>
+      </ol>
+      <p class="firefox"><strong style="color:var(--creme)">No Firefox 128 ou mais novo:</strong> abra <code>about:debugging#/runtime/this-firefox</code>, clique em <em>Carregar extensão temporária</em> e escolha o zip. Ela fica até o Firefox fechar. Para instalar de vez, veja o <a href="https://github.com/paulozy/onde-cacar/blob/main/LEIA-ME.md#firefox-128-ou-mais-novo">LEIA-ME</a>.</p>
+    </div>
+  </section>
+
+  <section class="bloco">
+    <div class="miolo selo">
+      <svg width="56" height="56" viewBox="0 0 56 56" aria-hidden="true">
+        <circle cx="28" cy="28" r="26" fill="#33202b" stroke="#480e1e" stroke-width="3"/>
+        <path d="M2 28h52" stroke="#480e1e" stroke-width="3"/>
+        <path d="M4 26a24 24 0 0 1 48 0z" fill="#d09a17"/>
+        <circle cx="28" cy="28" r="8" fill="#fff6ef" stroke="#480e1e" stroke-width="3"/>
+      </svg>
+      <div>
+        <h2>Nada sai do seu computador</h2>
+        <p style="color:var(--creme-suave);margin:0">Sem servidor, sem login, sem coleta de dados. Preferências e medições ficam no armazenamento do seu navegador. O código é aberto e não é minificado. <a href="loja/privacidade.html">Política de privacidade</a></p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="miolo">
+    <p>Onde Caçar é uma ferramenta da comunidade, sem ligação com os desenvolvedores do PokeIdle. Os números são estimativas: use a aba Sessão para conferir o seu ritmo real.</p>
+    <p>Licença MIT. Dúvidas e problemas: <a href="https://github.com/paulozy/onde-cacar/issues">abra uma issue</a>.</p>
+  </div>
+</footer>
+
+<script>
+  const abas = {
+    hunts: `
+      <div class="veredito">
+        <span class="rot">Melhor hunt liberada, segura e lucrativa</span>
+        <span class="nome">Floresta de Ilex</span>
+        <span>Selvagens de grama e inseto, nível 130 a 140</span>
+        <div class="nums">
+          <div><b>1,84 mi</b><span>XP/h</span></div>
+          <div><b>+12,4 mil</b><span>ouro líquido/h</span></div>
+          <div><b>2,1 s</b><span>por abate</span></div>
+          <div><b>2× eficaz</b><span>seu melhor golpe</span></div>
+        </div>
+      </div>
+      <table class="tabela">
+        <thead><tr><th>Hunt</th><th class="n">XP/h</th><th class="n">Ouro/h</th><th class="n opc">Dano sofrido</th></tr></thead>
+        <tbody>
+          <tr><td>Rota 38</td><td class="n">1,71 mi</td><td class="n">+9,8 mil</td><td class="n opc">6% do HP</td></tr>
+          <tr><td>Torre Queimada</td><td class="n">1,66 mi</td><td class="n">+14,1 mil</td><td class="n opc">11% do HP</td></tr>
+          <tr><td>Caverna Unida</td><td class="n">1,42 mi</td><td class="n">+7,3 mil</td><td class="n opc">4% do HP</td></tr>
+        </tbody>
+      </table>`,
+    setup: `
+      <div class="veredito">
+        <span class="rot">Para a Floresta de Ilex</span>
+        <span class="nome">Super Potion a 45%</span>
+        <span>A poção mais barata que segura essa hunt, com Great Ball</span>
+      </div>
+      <table class="tabela">
+        <thead><tr><th>Mochila para 3 h</th><th class="n">Levar</th><th class="n">Na bolsa</th><th class="n">Comprar</th></tr></thead>
+        <tbody>
+          <tr><td>Super Potion</td><td class="n">310</td><td class="n">120</td><td class="n">190</td></tr>
+          <tr><td>Great Ball</td><td class="n">540</td><td class="n">600</td><td class="n">0</td></tr>
+        </tbody>
+      </table>
+      <p class="nota">Custo da reposição: 41,8 mil de ouro.</p>`,
+    sessao: `
+      <div class="linha"><span>Medindo há 18 min · 512 abates</span><span>No ritmo</span></div>
+      <table class="tabela">
+        <thead><tr><th></th><th class="n">Medido</th><th class="n">Estimado</th></tr></thead>
+        <tbody>
+          <tr><td>Abates/h</td><td class="n">1.707</td><td class="n">1.714</td></tr>
+          <tr><td>XP/h</td><td class="n">1,81 mi</td><td class="n">1,84 mi</td></tr>
+          <tr><td>Ouro/h</td><td class="n">+12,9 mil</td><td class="n">+12,4 mil</td></tr>
+          <tr><td>Poções/h</td><td class="n">98</td><td class="n">103</td></tr>
+        </tbody>
+      </table>
+      <p class="nota">Depois de 15 minutos, o ranking das hunts passa a usar o que você mediu.</p>`,
+    progresso: `
+      <div class="linha"><span>Próxima faixa de Johto</span><span>nível 150</span></div>
+      <div class="barra"><i style="width:72%"></i></div>
+      <div class="linha"><span>Bosses do 300</span><span>~61 h no seu ritmo</span></div>
+      <div class="barra"><i style="width:31%"></i></div>
+      <div class="linha"><span>Orre, no 500</span><span>~214 h no seu ritmo</span></div>
+      <div class="barra"><i style="width:9%"></i></div>
+      <p class="nota">Com o Boost dos Atrasados, cada marco considera o boost só até ele vencer.</p>`
+  };
+  const botoes = [...document.querySelectorAll('.abas button')];
+  const area = document.getElementById('aba-conteudo');
+  function abrir(btn, foco) {
+    botoes.forEach(b => { const sel = b === btn; b.setAttribute('aria-selected', sel); b.tabIndex = sel ? 0 : -1; });
+    area.innerHTML = abas[btn.dataset.aba];
+    if (foco) btn.focus();
+  }
+  botoes.forEach((b, i) => {
+    b.addEventListener('click', () => abrir(b));
+    b.addEventListener('keydown', e => {
+      const d = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+      if (d) abrir(botoes[(i + d + botoes.length) % botoes.length], true);
+    });
+  });
+  abrir(botoes[0]);
+</script>
+</body>
+</html>
