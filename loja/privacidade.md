@@ -18,4 +18,4 @@ Com a automação opcional ligada (desligada por padrão), ela envia ao servidor
 O botão "Copiar diagnóstico" junta, só no seu computador, o que a extensão leu e calculou, tirando nick, e-mail e afins. O texto só sai dali se você mesmo colar em algum lugar.
 
 ## Contato
-[coloque aqui um e-mail ou o link do repositório]
+Dúvidas e problemas: abra uma issue em https://github.com/paulozy/onde-cacar/issues.
