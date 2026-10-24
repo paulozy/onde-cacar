@@ -107,8 +107,10 @@
   .tabela td.n { text-align: right; font-variant-numeric: tabular-nums; }
   .tabela th.n { text-align: right; }
   .tabela { border-spacing: 0 4px; border-collapse: separate; }
-  .barra { height: 12px; border-radius: 6px; background: var(--carvao); box-shadow: inset 0 0 0 2px var(--contorno); overflow: hidden; margin: 6px 0 14px; }
-  .barra i { display: block; height: 100%; background: linear-gradient(180deg, var(--ouro-claro) 0 3px, var(--ouro) 3px); }
+  .tabela small { display: block; font-size: 11.5px; font-weight: 600; color: var(--creme-suave); }
+  .verde { color: #9be59b; }
+  .pilula { display: inline-block; padding: 2px 9px; border-radius: 10px; font-size: 12px; font-weight: 700; color: #b7f0b7; background: #2f4a2f; }
+  .veredito .detalhe { margin: 8px 0 0; font-size: 13px; font-weight: 600; opacity: .8; }
   .linha { display: flex; justify-content: space-between; gap: 12px; font-weight: 600; }
   .nota { margin: 10px 0 0; font-size: 12.5px; color: var(--creme-suave); }
   .ilustr { position: absolute; right: 14px; bottom: -28px; font-size: 13px; color: var(--creme-suave); transform: rotate(-1.2deg); }
@@ -156,7 +158,7 @@
   @media (max-width: 480px) {
     .abas button { padding: 7px 9px; font-size: 13px; }
     .tabela .opc { display: none; }
-    .veredito .nome { font-size: 34px; }
+    .veredito .nome { font-size: 30px; }
   }
 </style>
 </head>
@@ -186,7 +188,7 @@
       <div class="painel-cab">
         <div>
           <h2>Onde caçar</h2>
-          <small>Quilava · nível 142 · em campo</small>
+          <small>Mega Charizard Y, nível 956, treinador 994</small>
         </div>
         <span class="x" aria-hidden="true">×</span>
       </div>
@@ -197,7 +199,7 @@
         <button role="tab" aria-selected="false" aria-controls="aba-conteudo" data-aba="progresso" tabindex="-1">Progresso</button>
       </div>
       <div id="aba-conteudo" class="conteudo" role="tabpanel"></div>
-      <span class="ilustr">Valores ilustrativos</span>
+      <span class="ilustr">Números de uma partida real</span>
     </div>
   </div>
 
@@ -272,58 +274,65 @@
   const abas = {
     hunts: `
       <div class="veredito">
-        <span class="rot">Melhor hunt liberada, segura e lucrativa</span>
-        <span class="nome">Floresta de Ilex</span>
-        <span>Selvagens de grama e inseto, nível 130 a 140</span>
+        <span class="rot">Melhor farm agora</span>
+        <span class="nome">Silcoon</span>
+        <span>Hoenn, nível 650</span>
         <div class="nums">
-          <div><b>1,84 mi</b><span>XP/h</span></div>
-          <div><b>+12,4 mil</b><span>ouro líquido/h</span></div>
-          <div><b>2,1 s</b><span>por abate</span></div>
-          <div><b>2× eficaz</b><span>seu melhor golpe</span></div>
+          <div><b>192,1 mi</b><span>XP/h do pokémon</span></div>
+          <div><b>+2,2 mi</b><span>ouro líquido/h</span></div>
+          <div><b>2,5 s</b><span>por abate</span></div>
+          <div><b>1%</b><span>pior golpe dele</span></div>
         </div>
+        <p class="detalhe">Ignition Point acerta ×2,5.</p>
       </div>
       <table class="tabela">
-        <thead><tr><th>Hunt</th><th class="n">XP/h</th><th class="n">Ouro/h</th><th class="n opc">Dano sofrido</th></tr></thead>
+        <thead><tr><th>Hunt</th><th class="n">XP/h</th><th class="n opc">Ouro líq./h</th><th class="n">Pior golpe</th></tr></thead>
         <tbody>
-          <tr><td>Rota 38</td><td class="n">1,71 mi</td><td class="n">+9,8 mil</td><td class="n opc">6% do HP</td></tr>
-          <tr><td>Torre Queimada</td><td class="n">1,66 mi</td><td class="n">+14,1 mil</td><td class="n opc">11% do HP</td></tr>
-          <tr><td>Caverna Unida</td><td class="n">1,42 mi</td><td class="n">+7,3 mil</td><td class="n opc">4% do HP</td></tr>
-        </tbody>
-      </table>`,
-    setup: `
-      <div class="veredito">
-        <span class="rot">Para a Floresta de Ilex</span>
-        <span class="nome">Super Potion a 45%</span>
-        <span>A poção mais barata que segura essa hunt, com Great Ball</span>
-      </div>
-      <table class="tabela">
-        <thead><tr><th>Mochila para 3 h</th><th class="n">Levar</th><th class="n">Na bolsa</th><th class="n">Comprar</th></tr></thead>
-        <tbody>
-          <tr><td>Super Potion</td><td class="n">310</td><td class="n">120</td><td class="n">190</td></tr>
-          <tr><td>Great Ball</td><td class="n">540</td><td class="n">600</td><td class="n">0</td></tr>
+          <tr><td>Beautifly<small>Hoenn, nível 850</small></td><td class="n">147,4 mi</td><td class="n opc verde">+1,3 mi</td><td class="n"><span class="pilula">20% do HP</span></td></tr>
+          <tr><td>Ninjask<small>Hoenn, nível 700</small></td><td class="n">144,3 mi</td><td class="n opc verde">+1,5 mi</td><td class="n"><span class="pilula">17% do HP</span></td></tr>
+          <tr><td>Wurmple<small>Hoenn, nível 500</small></td><td class="n">137,5 mi</td><td class="n opc verde">+1,8 mi</td><td class="n"><span class="pilula">1% do HP</span></td></tr>
+          <tr><td>Shedinja<small>Hoenn, nível 500</small></td><td class="n">137,5 mi</td><td class="n opc verde">+2 mi</td><td class="n"><span class="pilula">9% do HP</span></td></tr>
         </tbody>
       </table>
-      <p class="nota">Custo da reposição: 41,8 mil de ouro.</p>`,
+      <p class="nota">964 hunts simuladas em 459 ms com os dados do jogo.</p>`,
+    setup: `
+      <div class="veredito">
+        <span class="rot">Para o Silcoon, Hoenn nível 650</span>
+        <span class="nome">Golden Potion e Ultra Ball</span>
+        <span>Cure quando o HP cair abaixo de 50%: uns 7 por hora, 18,6 mil de ouro. A Ultra Ball captura 1,18% dos corpos, saldo de +494,9 mil/h.</span>
+      </div>
+      <table class="tabela">
+        <thead><tr><th>Mochila para 4 h</th><th class="n">Precisa</th><th class="n">Tem</th><th class="n">Falta</th></tr></thead>
+        <tbody>
+          <tr><td>Golden Potion</td><td class="n">33</td><td class="n">25</td><td class="n">8</td></tr>
+          <tr><td>Ultra Ball</td><td class="n">3.679</td><td class="n">3.127</td><td class="n">552</td></tr>
+        </tbody>
+      </table>
+      <p class="nota">Comprar o que falta: 91,8 mil de ouro. A hunt rende 9,2 mi no mesmo tempo.</p>`,
     sessao: `
-      <div class="linha"><span>Medindo há 18 min · 512 abates</span><span>No ritmo</span></div>
+      <div class="linha"><span>Silcoon há 150 min</span><span>2.083 abates</span></div>
       <table class="tabela">
         <thead><tr><th></th><th class="n">Medido</th><th class="n">Estimado</th></tr></thead>
         <tbody>
-          <tr><td>Abates/h</td><td class="n">1.707</td><td class="n">1.714</td></tr>
-          <tr><td>XP/h</td><td class="n">1,81 mi</td><td class="n">1,84 mi</td></tr>
-          <tr><td>Ouro/h</td><td class="n">+12,9 mil</td><td class="n">+12,4 mil</td></tr>
-          <tr><td>Poções/h</td><td class="n">98</td><td class="n">103</td></tr>
+          <tr><td>Abates/h</td><td class="n">835</td><td class="n">836</td></tr>
+          <tr><td>XP/h</td><td class="n">203,3 mi</td><td class="n">192,1 mi</td></tr>
+          <tr><td>Ouro</td><td class="n">4,2 mi</td><td class="n">1,7 mi/h</td></tr>
+          <tr><td>Consumo</td><td class="n" colspan="2">2.083 bolas, 40 poções, 26 capturas</td></tr>
         </tbody>
       </table>
-      <p class="nota">Depois de 15 minutos, o ranking das hunts passa a usar o que você mediu.</p>`,
+      <p class="nota">Depois de 15 min e 100 abates na mesma hunt, o ranking passa a usar os abates/h medidos no lugar do modelo.</p>`,
     progresso: `
-      <div class="linha"><span>Próxima faixa de Johto</span><span>nível 150</span></div>
-      <div class="barra"><i style="width:72%"></i></div>
-      <div class="linha"><span>Bosses do 300</span><span>~61 h no seu ritmo</span></div>
-      <div class="barra"><i style="width:31%"></i></div>
-      <div class="linha"><span>Orre, no 500</span><span>~214 h no seu ritmo</span></div>
-      <div class="barra"><i style="width:9%"></i></div>
-      <p class="nota">Com o Boost dos Atrasados, cada marco considera o boost só até ele vencer.</p>`
+      <div class="linha"><span>Treinador nível 994</span><span>ritmo de 203,3 mi/h</span></div>
+      <table class="tabela">
+        <thead><tr><th>Nível</th><th class="n">XP que falta</th><th class="n">No ritmo atual</th></tr></thead>
+        <tbody>
+          <tr><td>995<small>próximo nível</small></td><td class="n">23,5 mi</td><td class="n">7 min</td></tr>
+          <tr><td>1.000<small>Sinnoh e Outland 2</small></td><td class="n">271,3 mi</td><td class="n">1 h 20 min</td></tr>
+          <tr><td>2.000<small>Outland 3</small></td><td class="n">116,6 bi</td><td class="n">39,0 dias</td></tr>
+          <tr><td>3.100<small>bosses Groudon e Rayquaza</small></td><td class="n">479,3 bi</td><td class="n">198,9 dias</td></tr>
+        </tbody>
+      </table>
+      <p class="nota">Cada boost conta só até vencer.</p>`
   };
   const botoes = [...document.querySelectorAll('.abas button')];
   const area = document.getElementById('aba-conteudo');
