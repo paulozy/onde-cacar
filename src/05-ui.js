@@ -44,7 +44,7 @@
   async function recalcular(forcar = false) {
     const pk = pkAtivo();
     if (!welcome || !eu || !pk) { analise = null; return; }
-    const sig = assinar(pk) + JSON.stringify([prefs.ordem, prefs.pocao, prefs.bola, prefs.vender, prefs.bike, prefs.hpMinimo, prefs.precoBeast, prefs.tipoDiaManual]);
+    const sig = assinar(pk) + JSON.stringify([prefs.ordem, prefs.pocao, prefs.bola, prefs.vender, prefs.bike, prefs.hpMinimo, prefs.precoBeast, prefs.tipoDiaManual, prefs.precoToken, prefs.precoFragChave, prefs.precoFragShiny, prefs.precoFragBike]);
     if (!forcar && analise && sig === assinatura) return;
     try {
       jogo ??= await OC.carregarJogo();
@@ -152,8 +152,56 @@
   };
   const selRow = () => analise?.linhas.find((l) => l.slug === prefs.sel && !l.inviavel) ?? analise?.melhor ?? analise?.linhas.find((l) => !l.inviavel) ?? null;
 
+  function abaOutland() {
+    const { melhor, tiers } = analise;
+    const ativa = OC.sessao?.ativa();
+    const precos = [prefs.precoToken, prefs.precoFragChave, prefs.precoFragShiny, prefs.precoFragBike].some((v) => Number(v) > 0);
+    const melhorXp = analise.linhas.filter((l) => !l.inviavel && l.liberada && !OC.perigosa(l)).reduce((m, l) => Math.max(m, l.xpPkH), 0);
+    const cada = (h) => (h > 0 ? (1 / h < 1 ? `${dec(h, 1)}/h` : `1 a cada ${1 / h < 48 ? `${dec(1 / h)} h` : `${dec(1 / h / 24)} dias`}`) : '—');
+    const nomeTier = (t) => esc(t?.rotulo ?? `Outland ${t?.tier}`);
+    const linhas = analise.linhas.filter((l) => l.outland && !(prefs.esconderPerigo && !l.inviavel && OC.perigosa(l)));
+    let topo = '<div class="oc-caixa">Nenhuma hunt da Outland é segura com este pokémon agora.</div>';
+    if (melhor?.outland) {
+      const noTier = Number(eu?.outlandTier) === tiers.melhor.tier, aqui = noTier && ativa === melhor.slug;
+      topo = `<div class="oc-veredito">
+        <span class="oc-rot">Melhor Outland agora</span>
+        <b class="oc-nome">${esc(melhor.nome)}</b>
+        <span class="oc-onde">${nomeTier(tiers.melhor)} (drops raros ×${dec(tiers.melhor.mult, 2)}), nível 150</span>
+        <div class="oc-nums">
+          <div><b>${precos ? sinal(melhor.valorOutH) : sinal(melhor.liq)}</b><span>${precos ? 'valor/h com os raros' : 'ouro líquido/h'}</span></div>
+          <div><b>${cada(melhor.raros.token)}</b><span>Bronze Boss Token</span></div>
+          <div><b>${num(melhor.kph)}</b><span>abates/h</span></div>
+          <div><b>${curto(melhor.xpPkH)}</b><span>XP/h${melhorXp > melhor.xpPkH ? ` (${Math.round((1 - melhor.xpPkH / melhorXp) * 100)}% menos que o seu melhor farm)` : ''}</span></div>
+        </div>
+        <p>Você está na ${nomeTier(tiers.atual)}${noTier ? ', a mais alta que você liberou' : `, mas já liberou a ${nomeTier(tiers.melhor)}: ela tem os mesmos selvagens, XP e ouro, com ${Math.round((tiers.melhor.mult / tiers.atual.mult - 1) * 100)}% mais drops raros`}.
+        ${aqui ? '' : `<button type="button" class="oc-btn" data-outland="${esc(melhor.slug)}" data-nome="${esc(melhor.nome)}" data-tier="${tiers.melhor.tier}" ${OC.auto?.ocupado() ? 'disabled' : ''}>Ir para ${esc(melhor.nome)} na ${nomeTier(tiers.melhor)}</button>`}
+        <button type="button" class="oc-link" data-sel="${esc(melhor.slug)}">Ver o setup</button></p>
+      </div>`;
+    }
+    const corpo = linhas.slice(0, mostrando).map((l, i) => {
+      if (l.inviavel) return `<tr class="oc-dim"><td>${i + 1}</td><td><b>${esc(l.h?.nome ?? l.slug)}</b></td><td colspan="7">não mata o selvagem</td></tr>`;
+      const cls = [l === melhor ? 'oc-top' : '', l.slug === ativa ? 'oc-campo' : '', l.liberada ? '' : 'oc-dim'].join(' ');
+      const frag = l.raros.chave + l.raros.shiny + l.raros.bike;
+      return `<tr class="${cls}"><td>${i + 1}</td>
+        <td><button type="button" class="oc-hunt" data-sel="${esc(l.slug)}">${esc(l.nome)}</button>${l.slug === ativa ? '<span class="oc-aqui">você está aqui</span>' : ''}<small>×${dec(l.ef)} ${esc(l.melhorGolpe?.nome ?? '')}</small></td>
+        <td>${num(l.kph)}${l.calibrada ? '<small>medido</small>' : ''}</td><td>${cada(l.raros.token)}</td><td>${cada(frag)}</td>
+        ${precos ? `<td class="${l.valorOutH >= 0 ? 'oc-pos' : 'oc-neg'}">${sinal(l.valorOutH)}</td>` : ''}
+        <td class="${l.liq >= 0 ? 'oc-pos' : 'oc-neg'}">${sinal(l.liq)}</td><td>${curto(l.xpPkH)}</td><td>${risco(l)}</td></tr>`;
+    }).join('');
+    return `${topo}
+      <div class="oc-ctrl">
+        <span class="oc-seg">${[['xp', 'XP/h'], ['ouro', 'Ouro líquido'], ['abates', 'Abates/h'], ['outland', 'Outland']].map(([k, r]) => `<button type="button" data-ordem="${k}" aria-pressed="${prefs.ordem === k}">${r}</button>`).join('')}</span>
+        <label><input type="checkbox" data-pref="esconderPerigo" ${prefs.esconderPerigo ? 'checked' : ''}> esconder perigosas</label>
+      </div>
+      <div class="oc-tabela"><table><thead><tr><th>#</th><th>Hunt</th><th>Abates/h</th><th>Token</th><th>Fragmentos</th>${precos ? '<th>Valor/h</th>' : ''}<th>Ouro líq./h</th><th>XP/h</th><th>Pior golpe</th></tr></thead>
+      <tbody>${corpo || '<tr><td colspan="9">Nenhuma hunt passa nos filtros.</td></tr>'}</tbody></table>
+      ${linhas.length > mostrando ? `<button type="button" class="oc-mais" data-acao="mais">mostrar mais (${linhas.length - mostrando})</button>` : ''}</div>
+      <p class="oc-rodape">As 8 Outlands têm os mesmos selvagens, XP, ouro e captura; só os drops raros mudam (Bronze Boss Token ${dec(analise.raros.token * 100, 3)}% e cada fragmento — Chave, Shiny Stone, Bicicleta — ${dec(analise.raros.chave * 100, 4)}% por abate na Outland 1), e a tabela já usa a mais alta que você liberou${(analise.op.multLoot || 1) > 1 ? ` e o seu bônus de loot (×${dec(analise.op.multLoot, 2)})` : ''}. “Fragmentos” soma os três tipos. ${precos ? 'O valor/h soma o ouro líquido com os raros pelos preços dos Ajustes, já tirando os 15% de comissão do Mercado.' : 'Ponha o preço do token e dos fragmentos em Ajustes para ver o valor por hora.'} O ouro líquido inclui a venda das capturas ao NPC: as variantes da Outland nascem no Nv 100 e valem ×3.</p>`;
+  }
+
   function abaHunts() {
     if (!analise) return '';
+    if (prefs.ordem === 'outland') return abaOutland();
     const { melhor, alternativa, bonus } = analise;
     const ativa = OC.sessao?.ativa();
     let topo = '<div class="oc-caixa">Nenhuma hunt liberada é segura e lucrativa com este pokémon agora.</div>';
@@ -187,7 +235,7 @@
     return `${topo}
       <div class="oc-linha">Bônus de XP: ${bon}${bonus.itens.length ? ` <b>(pokémon ×${dec(bonus.pk, 2)}, treinador ×${dec(bonus.tr, 2)})</b>` : ''}</div>
       <div class="oc-ctrl">
-        <span class="oc-seg">${[['xp', 'XP/h'], ['ouro', 'Ouro líquido'], ['abates', 'Abates/h']].map(([k, r]) => `<button type="button" data-ordem="${k}" aria-pressed="${prefs.ordem === k}">${r}</button>`).join('')}</span>
+        <span class="oc-seg">${[['xp', 'XP/h'], ['ouro', 'Ouro líquido'], ['abates', 'Abates/h'], ['outland', 'Outland']].map(([k, r]) => `<button type="button" data-ordem="${k}" aria-pressed="${prefs.ordem === k}">${r}</button>`).join('')}</span>
         <label><input type="checkbox" data-pref="soLiberadas" ${prefs.soLiberadas ? 'checked' : ''}> só liberadas</label>
         <label><input type="checkbox" data-pref="esconderPerigo" ${prefs.esconderPerigo ? 'checked' : ''}> esconder perigosas</label>
       </div>
@@ -331,6 +379,10 @@
       <h4 class="oc-sub">Valores de referência</h4>
       <div class="oc-form">
       <label>Gemas por diamante no Mercado<input type="number" class="oc-num" min="1" step="0.5" value="${prefs.precoDiamante}" data-pref-num="precoDiamante"></label>
+      <label>Bronze Boss Token no Mercado (Coins)<input type="number" class="oc-num" min="0" step="10000" value="${Number(prefs.precoToken) || 0}" data-pref-num="precoToken"></label>
+      <label>Fragmento de Chave (Coins)<input type="number" class="oc-num" min="0" step="10000" value="${Number(prefs.precoFragChave) || 0}" data-pref-num="precoFragChave"></label>
+      <label>Fragmento de Shiny Stone (Coins)<input type="number" class="oc-num" min="0" step="10000" value="${Number(prefs.precoFragShiny) || 0}" data-pref-num="precoFragShiny"></label>
+      <label>Fragmento de Bicicleta (Coins)<input type="number" class="oc-num" min="0" step="10000" value="${Number(prefs.precoFragBike) || 0}" data-pref-num="precoFragBike"></label>
       <label>Alvo do Boost dos Atrasados (se o jogo não informar)<input type="number" class="oc-num" min="1" value="${prefs.alvoAtrasados}" data-pref-num="alvoAtrasados"></label>
       </div>
       <h4 class="oc-sub">Automação (desligada até você ligar)</h4>
@@ -550,6 +602,10 @@
     busca?.addEventListener('change', () => { const e = acharEspecie(busca.value); prefs.alvo = e?.pokeId ?? null; alvoTxt = busca.value; salvarPrefs(); desenhar(); });
     painel.querySelector('[data-acao="alvo-limpar"]')?.addEventListener('click', () => { prefs.alvo = null; alvoTxt = ''; salvarPrefs(); desenhar(); });
     for (const b of painel.querySelectorAll('[data-alvo-ir]')) b.addEventListener('click', async () => { prefs.sel = b.dataset.alvoIr; prefs.aba = 'setup'; if (b.dataset.bola) prefs.bola = b.dataset.bola; salvarPrefs(); await recalcular(true); desenhar(); });
+    for (const b of painel.querySelectorAll('[data-outland]')) b.addEventListener('click', () => {
+      b.disabled = true; b.textContent = 'Indo…';
+      OC.auto.irPara(b.dataset.outland, b.dataset.nome, { tier: Number(b.dataset.tier) }).then(() => desenhar());
+    });
     for (const b of painel.querySelectorAll('[data-gravar]')) b.addEventListener('click', () => { if (OC.auto.gravando()) OC.auto.cancelarGravacao(); else OC.auto.gravarSaida(b.dataset.gravar); desenhar(); });
     painel.querySelector('[data-acao="preparar"]')?.addEventListener('click', () => { confirmando = selRow()?.slug ?? null; desenhar(); });
     painel.querySelector('[data-acao="preparar-nao"]')?.addEventListener('click', () => { confirmando = null; desenhar(); });
@@ -567,7 +623,7 @@
     });
     for (const i of painel.querySelectorAll('[data-pref-num]')) i.addEventListener('change', async () => {
       const k = i.dataset.prefNum; prefs[k] = k === 'horas' ? (Number(i.value) || 4) : k === 'autoForcarApos' ? Math.max(0.5, Number(i.value) || 2) : Math.max(0, Number(i.value) || 0); salvarPrefs();
-      if (k === 'precoBeast') await recalcular(true); desenhar();
+      if (['precoBeast', 'precoToken', 'precoFragChave', 'precoFragShiny', 'precoFragBike'].includes(k)) await recalcular(true); desenhar();
     });
   }
 

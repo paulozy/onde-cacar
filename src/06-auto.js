@@ -126,8 +126,9 @@
   }
 
   /** Vai para a hunt assim que estiver fora de combate; se não liberar, força a saída (se você permitiu). */
-  async function irPara(slug, nome) {
-    if (eu?.huntSlug === slug && !eu?.noCentro) return true;
+  async function irPara(slug, nome, opts = {}) {
+    const tierOk = () => !opts.tier || Number(eu?.outlandTier) === Number(opts.tier);
+    if (eu?.huntSlug === slug && !eu?.noCentro && tierOk()) return true;
     const p = prefs();
     const limiteForcar = Date.now() + Math.max(0.5, Number(p.autoForcarApos) || 2) * 60000;
     const ate = Date.now() + 8 * 60000;
@@ -137,11 +138,13 @@
       if (livre.ok) {
         const espera = ultimaAcao + ESPACO_MS - Date.now();
         if (espera > 0) await dormir(espera);
+        // a Outland é escolhida à parte (outland.tier) e o slug da hunt é o mesmo nas 8
+        if (!tierOk()) { OC.enviar({ t: 'outland.tier', tier: Number(opts.tier) }); await dormir(800); }
         OC.enviar({ t: 'hunt.select', slug });
         ultimaAcao = Date.now();
         const fim = Date.now() + 6000;
-        while (Date.now() < fim && eu?.huntSlug !== slug) await dormir(300);
-        if (eu?.huntSlug === slug) { registrar(`agora caçando em ${nome}`); ultimaHunt = Date.now(); return true; }
+        while (Date.now() < fim && !(eu?.huntSlug === slug && tierOk())) await dormir(300);
+        if (eu?.huntSlug === slug && tierOk()) { registrar(`agora caçando em ${nome}${opts.tier ? ` (Outland ${opts.tier})` : ''}`); ultimaHunt = Date.now(); return true; }
       } else {
         if (!avisou) { registrar(`esperando para ir a ${nome}: ${livre.motivo}`); avisou = true; }
         if (!forcou && livre.motivo === 'em combate' && p.autoForcar && p.autoForcar !== 'nao' && Date.now() > limiteForcar) {
@@ -170,7 +173,7 @@
       try {
         registrar(`preparando ${r.nome}`);
         if (!(await reabastecer(lista))) return;
-        await irPara(r.slug, r.nome);
+        await irPara(r.slug, r.nome, r.outland ? { tier: r.tierAlvo } : {});
       } finally { ocupado = false; OC.emit('auto', null); }
     },
   };

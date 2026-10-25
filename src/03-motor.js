@@ -271,10 +271,50 @@
     return Math.max(piso, Math.min(teto, base * (forca / fator) * 1.4)); // corpo caído: HP 0 → ×1,4
   }
   OC.chanceCaptura = chanceCaptura;
+  // Wiki: o valorBase da venda ao NPC tem teto de 64.907 (a base de uma espécie da hunt nível 2.500)
+  function tetoValorBase(ctx) {
+    const e = ctx.welcome?.economia ?? {};
+    for (const [k, v] of Object.entries(e)) if (/teto|max/i.test(k) && /valor|base|venda|npc/i.test(k) && Number(v) > 1000) return Number(v);
+    return 64907;
+  }
+
+  // ---- Outland: drops raros por tier ------------------------------------------------------------
+  // O valor que o jogo manda pode vir como fração, porcentagem ou "1 em N": fica a leitura mais
+  // perto do número da Wiki, e a Wiki vale se nenhuma leitura chegar perto.
+  function normalizarChance(v, esperado) {
+    v = Number(v);
+    if (!(v > 0)) return esperado;
+    const cands = [v, v / 100, v / 100000, 1 / v];
+    let melhor = esperado, dist = Infinity;
+    for (const c of cands) { const d = Math.abs(Math.log(c / esperado)); if (d < dist) { dist = d; melhor = c; } }
+    return dist < Math.log(10) ? melhor : esperado;
+  }
+  function chanceEm(obj, esperado) {
+    if (obj == null) return esperado;
+    if (typeof obj !== 'object') return normalizarChance(obj, esperado);
+    for (const [k, v] of Object.entries(obj)) if (/chance|drop/i.test(k) && typeof v === 'number') return normalizarChance(v, esperado);
+    return esperado;
+  }
+  OC.raros = (ctx) => ({
+    token: chanceEm(ctx.welcome?.chanceBossToken, 0.0005),
+    chave: chanceEm(ctx.welcome?.casas, 0.000005),
+    shiny: chanceEm(ctx.welcome?.shinyStone, 0.000005),
+    bike: chanceEm(ctx.welcome?.bicicletas, 0.000005),
+  });
+  OC.tiersOutland = (ctx) => {
+    const t = Array.isArray(ctx.welcome?.outlandTiers) && ctx.welcome.outlandTiers.length ? ctx.welcome.outlandTiers
+      : [[1, 150, 1], [2, 1000, 1.25], [3, 2000, 1.5], [4, 4000, 2], [5, 8000, 3], [6, 16000, 4], [7, 24000, 6], [8, 36000, 8]].map(([tier, nivel, mult]) => ({ tier, rotulo: `Outland ${tier}`, nivel, mult }));
+    const L = Number(ctx.eu?.level) || 0;
+    const liberadas = t.filter((x) => L >= x.nivel);
+    const melhor = liberadas[liberadas.length - 1] ?? t[0];
+    const atual = t.find((x) => x.tier === Number(ctx.eu?.outlandTier)) ?? t[0];
+    return { todos: t, melhor, atual };
+  };
   // Venda ao NPC (Wiki): valorBase × (1 + nível/50) × qualidade (média ~1,18); nível = o da hunt
   // até 100, acima disso o teto do estágio.
   function vendaCaptura(esp, nv, ctx) {
-    const base = esp.priceNpc > 0 ? esp.priceNpc : (esp.sellValue > 0 ? esp.sellValue : 0);
+    const bruto = esp.priceNpc > 0 ? esp.priceNpc : (esp.sellValue > 0 ? esp.sellValue : 0);
+    const base = Math.min(bruto, tetoValorBase(ctx));
     if (!(base > 0)) return 0;
     const nivel = nv <= 100 ? nv : (tetoDe(esp, ctx) ?? 100);
     return Math.floor(base * (1 + nivel / 50) * 1.18);
@@ -338,7 +378,7 @@
       if (Number(esp.pokeId) >= 2001 && Number(esp.pokeId) < 3000) {
         const nome = 'Bronze Boss Token', item = ctx.itens.porNome.get(nome);
         const atual = loot.get(nome) ?? { nome, id: item?.id ?? null, preco: 0, porAbate: 0, chance: 0 };
-        const c = 0.0005 * (op.multLoot || 1) * (Number(op.degrauOutland) || 1);
+        const c = (OC.raros?.(ctx).token ?? 0.0005) * (op.multLoot || 1) * (Number(op.degrauOutland) || 1);
         atual.porAbate += w * c; atual.chance += w * c;
         loot.set(nome, atual);
       }
@@ -435,15 +475,29 @@
     const boostLoot = agora < (Number(ctx.eu?.loja?.boosts?.loot) || 0) ? ((ctx.welcome?.tiposBoost ?? []).find((b) => b.chave === 'loot')?.mult ?? 1.4) : 1;
     op.multLoot = boostLoot * (1 + (Number(ctx.eu?.guildBonusPct) || 0) / 100);
     op.calib = OC.sessao?.calibracao?.() ?? {};
+    const tiers = OC.tiersOutland(ctx);
+    op.degrauOutland = tiers.atual.mult;
+    const raros = OC.raros(ctx);
     op.tipoDia = (op.tipoDiaManual && op.tipoDiaManual !== 'auto') ? (op.tipoDiaManual === 'nenhum' ? null : op.tipoDiaManual) : (OC.tipoDoDia?.(ctx) ?? null);
     const t0 = performance.now();
     const linhas = [];
     for (const h of ctx.hunts ?? []) { const r = simular(h, P, ef, ctx, op); if (r) linhas.push(r); }
-    const chave = op.ordem === 'ouro' ? 'liq' : op.ordem === 'abates' ? 'kph' : 'xpPkH';
+    const liq = 0.85; // a venda no Mercado em Coins paga 85% (15% de comissão)
+    for (const r of linhas) {
+      r.outland = (r.h?.area ?? r.h?.regiao) === 'outland';
+      if (!r.outland || r.inviavel) continue;
+      const m = r.kph * (op.multLoot || 1) * tiers.melhor.mult;
+      r.tierAlvo = tiers.melhor.tier;
+      r.raros = { token: m * raros.token, chave: m * raros.chave, shiny: m * raros.shiny, bike: m * raros.bike };
+      r.rarosValorH = liq * (r.raros.token * (Number(op.precoToken) || 0) + r.raros.chave * (Number(op.precoFragChave) || 0)
+        + r.raros.shiny * (Number(op.precoFragShiny) || 0) + r.raros.bike * (Number(op.precoFragBike) || 0));
+      r.valorOutH = r.liq + r.rarosValorH;
+    }
+    const chave = op.ordem === 'ouro' ? 'liq' : op.ordem === 'abates' ? 'kph' : op.ordem === 'outland' ? 'valorOutH' : 'xpPkH';
     linhas.sort((a, b) => (a.inviavel - b.inviavel) || ((b[chave] ?? 0) - (a[chave] ?? 0)));
     // melhor: a primeira da ordem escolhida entre as liberadas, seguras e com lucro.
     // Se outra rende quase o mesmo XP (até 5% a menos) e bem mais ouro, ela vira a alternativa.
-    const boas = linhas.filter((r) => !r.inviavel && r.liberada && !perigosa(r) && r.liq >= 0);
+    const boas = linhas.filter((r) => !r.inviavel && r.liberada && !perigosa(r) && (op.ordem === 'outland' ? r.outland : r.liq >= 0));
     const melhor = boas[0] ?? null;
     let alternativa = null;
     if (melhor && op.ordem === 'xp') {
@@ -451,7 +505,7 @@
         .sort((a, b) => b.liq - a.liq)[0] ?? null;
     }
     const empate = [];
-    return { P, linhas, melhor, empate, alternativa, bonus: op.mult, ms: Math.round(performance.now() - t0), op };
+    return { P, linhas, melhor, empate, alternativa, bonus: op.mult, ms: Math.round(performance.now() - t0), op, tiers, raros };
   };
 
   OC._interno = { danoBase, segundosPorAbate, abatesPorHora, chanceCaptura, bonusXp, montarPokemon, criarEf };
