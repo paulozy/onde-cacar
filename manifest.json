@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Onde Caçar: ajudante não oficial do PokeIdle",
   "short_name": "Onde Caçar",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "description": "Ajudante não oficial do PokeIdle: melhores hunts para o seu pokémon, poção e pokébola certas, sessão ao vivo, progresso e avisos.",
   "icons": {
     "16": "icons/16.png",

@@ -52,6 +52,8 @@
     if (eu) OC.emit('estado', eu);
   }
 
+  const relogio = [];
+  OC.agoraServidor = () => Date.now() + (OC.offsetServidor || 0);
   function aoReceber(ev) {
     if (typeof ev.data !== 'string') return;
     const cab = ev.data.slice(0, 48);
@@ -59,7 +61,17 @@
     if (cab.includes('"t":"welcome"')) tipo = 'welcome';
     else if (cab.includes('"t":"estado"')) tipo = 'estado';
     else if (cab.includes('"t":"campo.init"')) tipo = 'campo.init';
-    else if (cab.includes('"t":"campo"')) tipo = 'campo';
+    else if (cab.includes('"t":"campo"')) {
+      tipo = 'campo';
+      // relógio do servidor: o "ts" do campo chega um pouco depois de ser carimbado, então a
+      // maior diferença recente é a melhor estimativa de quanto o servidor está à frente
+      const ts = ev.data.slice(0, 120).match(/"ts"\s*:\s*(\d{13})/);
+      if (ts) {
+        const d = Number(ts[1]) - Date.now();
+        relogio.push(d); if (relogio.length > 40) relogio.shift();
+        OC.offsetServidor = Math.max(...relogio);
+      }
+    }
     else if (cab.includes('"t":"erro"')) tipo = 'erro';
     else if (cab.includes('"t":"batalha"')) {
       OC.ultimoCombate = Date.now();

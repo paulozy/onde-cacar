@@ -37,12 +37,21 @@
 
   // ---- estado ----------------------------------------------------------------------------
   let welcome = null, eu = null, jogo = null, itens = null, analise = null, assinatura = '', erro = null;
-  let painel = null, mostrando = 25, confirmando = null, diagMsg = '';
+  let painel = null, mostrando = 25, confirmando = null, confirmandoUpar = null, diagMsg = '';
   const pkAtivo = () => eu?.pokemons?.find((p) => p.id === eu.activeId) ?? null;
+  // o pokémon que a aba Hunts simula: o escolhido em "Upar" ou, sem escolha, o que está em campo
+  const pkAnalise = () => {
+    if (prefs.pkUpar != null) {
+      if (prefs.pkUpar === eu?.activeId) prefs.pkUpar = null; // já está em campo
+      else { const p = eu?.pokemons?.find((x) => String(x.id) === String(prefs.pkUpar)); if (p) return p; }
+    }
+    return pkAtivo();
+  };
+  const simulandoOutro = () => { const p = pkAnalise(); return !!p && p.id !== eu?.activeId; };
   const assinar = (pk) => (pk ? `${pk.id}|${pk.level}|${pk.tmElemental ?? ''}|${JSON.stringify(pk.stats)}|${eu?.level}` : '');
 
   async function recalcular(forcar = false) {
-    const pk = pkAtivo();
+    const pk = pkAnalise();
     if (!welcome || !eu || !pk) { analise = null; return; }
     const sig = assinar(pk) + JSON.stringify([prefs.ordem, prefs.pocao, prefs.bola, prefs.vender, prefs.bike, prefs.hpMinimo, prefs.precoBeast, prefs.tipoDiaManual, prefs.precoToken, prefs.precoFragChave, prefs.precoFragShiny, prefs.precoFragBike]);
     if (!forcar && analise && sig === assinatura) return;
@@ -111,7 +120,7 @@
 
   async function desenhar(forcar = false) {
     if (!painel) return;
-    const pk = pkAtivo();
+    const pk = pkAnalise();
     if (!welcome || !eu) { pintar(painel, cab(pk) + '<div class="oc-carga">Esperando o jogo conectar…</div>'); ligar(); return; }
     if (!pk) { pintar(painel, cab(null) + '<div class="oc-aviso">Coloque um pokémon em campo para ver onde caçar.</div>'); ligar(); return; }
     if (!analise || forcar) {
@@ -134,7 +143,7 @@
 
   function cab(pk) {
     const q = Number(pk?.quality ?? pk?.qualidade);
-    const sub = pk ? [esc(pk.nome), `Nv ${num(pk.level)}`, `P${pk.potencia ?? 1}`, Number.isFinite(q) ? `Q ${dec(q, 3)}` : '', eu?.level ? `treinador ${num(eu.level)}` : '']
+    const sub = pk ? [esc(pk.nome) + (simulandoOutro() ? ' (simulando, não está em campo)' : ''), `Nv ${num(pk.level)}`, `P${pk.potencia ?? 1}`, Number.isFinite(q) ? `Q ${dec(q, 3)}` : '', eu?.level ? `treinador ${num(eu.level)}` : '']
       .filter(Boolean).join(', ') : 'nenhum pokémon em campo';
     return `<div class="oc-cab"><div class="oc-titulo"><h3>Onde caçar</h3><small>${sub}</small></div>
       <button type="button" class="oc-fechar" data-acao="fechar" aria-label="Fechar">×</button></div>`;
@@ -151,6 +160,26 @@
     return `<span class="oc-tag oc-bom">${pct(r.hitPct)} do HP</span>`;
   };
   const selRow = () => analise?.linhas.find((l) => l.slug === prefs.sel && !l.inviavel) ?? analise?.melhor ?? analise?.linhas.find((l) => !l.inviavel) ?? null;
+
+  function seletorUpar() {
+    const lista = (eu?.pokemons ?? []).slice().sort((a, b) => ((b.id === eu.activeId) - (a.id === eu.activeId)) || ((Number(b.level) || 0) - (Number(a.level) || 0)));
+    if (lista.length < 2) return '';
+    const atual = pkAnalise()?.id;
+    return `<div class="oc-ctrl"><label>Upar <select data-upar>${lista.map((p) => `<option value="${esc(String(p.id))}" ${p.id === atual ? 'selected' : ''}>${esc(p.nome)} · nv ${num(p.level)}${p.id === eu.activeId ? ' (em campo)' : ''}</option>`).join('')}</select></label>
+      ${simulandoOutro() ? '<span class="oc-nota">simulando sem trocar quem está em campo</span>' : ''}</div>`;
+  }
+  function blocoUpar(r) {
+    const pk = pkAnalise(), ativo = pkAtivo();
+    if (!r || !pk || !simulandoOutro()) return '';
+    if ((Number(pk.level) || 0) > (Number(eu?.level) || 0) + 5) return `<div class="oc-aviso">${esc(pk.nome)} está mais de 5 níveis acima do treinador (nv ${num(eu.level)}), e o jogo não deixa ele entrar em campo. Dá para usar “Reduzir o nível” na ficha dele ou esperar o treinador subir.</div>`;
+    const grav = OC.auto?.gravando() === 'ativar';
+    if (!prefs.ativar?.caminho) return `<div class="oc-caixa">Para trocar o pokémon em campo, a extensão precisa aprender a mensagem do jogo uma vez. ${grav ? '<b>Gravando:</b> ponha agora, pelo jogo, qualquer outro pokémon da equipe em campo.' : 'Aperte o botão e, pelo jogo, ponha qualquer outro pokémon da equipe em campo.'}
+      <div class="oc-ctrl" style="margin:8px 0 0"><button type="button" class="oc-btn" data-gravar="ativar">${grav ? 'Cancelar' : 'Ensinar a troca de pokémon'}</button></div></div>`;
+    const forca = prefs.autoForcar && prefs.autoForcar !== 'nao';
+    if (confirmandoUpar === r.slug) return `<div class="oc-caixa"><p>Vou tirar ${esc(ativo?.nome ?? 'o pokémon atual')} de campo, colocar <b>${esc(pk.nome)}</b> e levar você para <b>${esc(r.nome)}</b>${r.outland ? ` na Outland ${r.tierAlvo}` : ''} assim que a troca de área liberar${forca ? ` (se não liberar em ${dec(Number(prefs.autoForcarApos) || 2, 1)} min, com a saída forçada)` : ''}.</p>
+      <button type="button" class="oc-btn" data-acao="upar-ok" data-slug="${esc(r.slug)}">Confirmar</button> <button type="button" class="oc-link" data-acao="upar-nao">cancelar</button></div>`;
+    return `<div class="oc-ctrl"><button type="button" class="oc-btn" data-acao="upar" data-slug="${esc(r.slug)}" ${OC.auto?.ocupado() ? 'disabled' : ''}>Colocar ${esc(pk.nome)} em campo e caçar em ${esc(r.nome)}</button>${OC.auto ? `<span class="oc-nota">${esc(OC.auto.status())}</span>` : ''}</div>`;
+  }
 
   function abaOutland() {
     const { melhor, tiers } = analise;
@@ -174,7 +203,7 @@
           <div><b>${curto(melhor.xpPkH)}</b><span>XP/h${melhorXp > melhor.xpPkH ? ` (${Math.round((1 - melhor.xpPkH / melhorXp) * 100)}% menos que o seu melhor farm)` : ''}</span></div>
         </div>
         <p>Você está na ${nomeTier(tiers.atual)}${noTier ? ', a mais alta que você liberou' : `, mas já liberou a ${nomeTier(tiers.melhor)}: ela tem os mesmos selvagens, XP e ouro, com ${Math.round((tiers.melhor.mult / tiers.atual.mult - 1) * 100)}% mais drops raros`}.
-        ${aqui ? '' : `<button type="button" class="oc-btn" data-outland="${esc(melhor.slug)}" data-nome="${esc(melhor.nome)}" data-tier="${tiers.melhor.tier}" ${OC.auto?.ocupado() ? 'disabled' : ''}>Ir para ${esc(melhor.nome)} na ${nomeTier(tiers.melhor)}</button>`}
+        ${aqui || simulandoOutro() ? '' : `<button type="button" class="oc-btn" data-outland="${esc(melhor.slug)}" data-nome="${esc(melhor.nome)}" data-tier="${tiers.melhor.tier}" ${OC.auto?.ocupado() ? 'disabled' : ''}>Ir para ${esc(melhor.nome)} na ${nomeTier(tiers.melhor)}</button>`}
         <button type="button" class="oc-link" data-sel="${esc(melhor.slug)}">Ver o setup</button></p>
       </div>`;
     }
@@ -188,7 +217,7 @@
         ${precos ? `<td class="${l.valorOutH >= 0 ? 'oc-pos' : 'oc-neg'}">${sinal(l.valorOutH)}</td>` : ''}
         <td class="${l.liq >= 0 ? 'oc-pos' : 'oc-neg'}">${sinal(l.liq)}</td><td>${curto(l.xpPkH)}</td><td>${risco(l)}</td></tr>`;
     }).join('');
-    return `${topo}
+    return `${seletorUpar()}${topo}${melhor?.outland ? blocoUpar(melhor) : ''}
       <div class="oc-ctrl">
         <span class="oc-seg">${[['xp', 'XP/h'], ['ouro', 'Ouro líquido'], ['abates', 'Abates/h'], ['outland', 'Outland']].map(([k, r]) => `<button type="button" data-ordem="${k}" aria-pressed="${prefs.ordem === k}">${r}</button>`).join('')}</span>
         <label><input type="checkbox" data-pref="esconderPerigo" ${prefs.esconderPerigo ? 'checked' : ''}> esconder perigosas</label>
@@ -232,7 +261,7 @@
         <td>${seg(l.ttk)}</td><td>${num(l.kph)}${l.calibrada ? `<small title="medido na aba Sessão (${num(l.calib.min)} min); o modelo dava ${num(l.kphModelo)}">medido</small>` : ''}</td>
         <td>×${dec(l.ef)}<small>${esc(l.melhorGolpe?.nome ?? '')}</small></td><td>${risco(l)}</td></tr>`;
     }).join('');
-    return `${topo}
+    return `${seletorUpar()}${topo}${blocoUpar(melhor)}
       <div class="oc-linha">Bônus de XP: ${bon}${bonus.itens.length ? ` <b>(pokémon ×${dec(bonus.pk, 2)}, treinador ×${dec(bonus.tr, 2)})</b>` : ''}</div>
       <div class="oc-ctrl">
         <span class="oc-seg">${[['xp', 'XP/h'], ['ouro', 'Ouro líquido'], ['abates', 'Abates/h'], ['outland', 'Outland']].map(([k, r]) => `<button type="button" data-ordem="${k}" aria-pressed="${prefs.ordem === k}">${r}</button>`).join('')}</span>
@@ -286,7 +315,7 @@
     const aqui = eu?.huntSlug === r.slug && !eu?.noCentro;
     const autoTxt = OC.auto ? `<div class="oc-auto">
         ${confirmando === r.slug
-          ? `<p>Vou comprar ${lista.filter((i) => i.falta > 0 && !i.premium).map((i) => `${num(i.falta)} ${esc(i.nome)}`).join(' e ') || 'nada'} (${curto(custo)} de ouro; você tem ${curto(Number(eu?.gold) || 0)})${aqui ? '' : ` e levar você para ${esc(r.nome)} assim que sair de combate`}.${(Number(eu?.gold) || 0) - custo < (Number(prefs.autoReserva) || 0) ? ` <b class="oc-neg">Isso deixaria o ouro abaixo da reserva de ${curto(Number(prefs.autoReserva) || 0)} (Ajustes): a compra vai parar antes.</b>` : ''}</p>
+          ? `<p>Vou comprar ${lista.filter((i) => i.falta > 0 && !i.premium).map((i) => `${num(i.falta)} ${esc(i.nome)}`).join(' e ') || 'nada'} (${curto(custo)} de ouro; você tem ${curto(Number(eu?.gold) || 0)})${simulandoOutro() ? `, colocar ${esc(pkAnalise().nome)} em campo` : ''}${aqui && !simulandoOutro() ? '' : ` e levar você para ${esc(r.nome)} assim que a troca de área liberar`}.${simulandoOutro() && !prefs.ativar?.caminho ? ' <b class="oc-neg">Antes, ensine a troca de pokémon na aba Hunts.</b>' : ''}${(Number(eu?.gold) || 0) - custo < (Number(prefs.autoReserva) || 0) ? ` <b class="oc-neg">Isso deixaria o ouro abaixo da reserva de ${curto(Number(prefs.autoReserva) || 0)} (Ajustes): a compra vai parar antes.</b>` : ''}</p>
              <button type="button" class="oc-btn" data-acao="preparar-ok">Confirmar</button> <button type="button" class="oc-link" data-acao="preparar-nao">cancelar</button>`
           : `<button type="button" class="oc-btn" data-acao="preparar" ${OC.auto.ocupado() ? 'disabled' : ''}>${aqui ? 'Comprar o que falta' : 'Comprar o que falta e caçar aqui'}</button>`}
         <p class="oc-nota">${esc(OC.auto.status())}</p></div>` : '';
@@ -606,12 +635,27 @@
       b.disabled = true; b.textContent = 'Indo…';
       OC.auto.irPara(b.dataset.outland, b.dataset.nome, { tier: Number(b.dataset.tier) }).then(() => desenhar());
     });
+    painel.querySelector('[data-upar]')?.addEventListener('change', async (ev) => {
+      const p = eu?.pokemons?.find((x) => String(x.id) === ev.target.value);
+      prefs.pkUpar = p && p.id !== eu.activeId ? p.id : null; confirmandoUpar = null; prefs.sel = null; salvarPrefs();
+      await desenhar(true);
+    });
+    painel.querySelector('[data-acao="upar"]')?.addEventListener('click', (ev) => { confirmandoUpar = ev.currentTarget.dataset.slug; desenhar(); });
+    painel.querySelector('[data-acao="upar-nao"]')?.addEventListener('click', () => { confirmandoUpar = null; desenhar(); });
+    painel.querySelector('[data-acao="upar-ok"]')?.addEventListener('click', (ev) => {
+      const r = analise?.linhas.find((l) => l.slug === ev.currentTarget.dataset.slug), pk = pkAnalise();
+      confirmandoUpar = null;
+      if (r && pk) OC.auto.uparEm(pk.id, r.slug, r.nome, r.outland ? { tier: r.tierAlvo } : {})
+        .then(async (ok) => { if (ok) { prefs.pkUpar = null; salvarPrefs(); } await recalcular(true); desenhar(); });
+      desenhar();
+    });
     for (const b of painel.querySelectorAll('[data-gravar]')) b.addEventListener('click', () => { if (OC.auto.gravando()) OC.auto.cancelarGravacao(); else OC.auto.gravarSaida(b.dataset.gravar); desenhar(); });
     painel.querySelector('[data-acao="preparar"]')?.addEventListener('click', () => { confirmando = selRow()?.slug ?? null; desenhar(); });
     painel.querySelector('[data-acao="preparar-nao"]')?.addEventListener('click', () => { confirmando = null; desenhar(); });
     painel.querySelector('[data-acao="preparar-ok"]')?.addEventListener('click', () => {
       const r = selRow(); confirmando = null;
-      if (r) OC.auto.preparar(r, OC.mochila(r, Math.max(0.5, Number(prefs.horas) || 4)));
+      if (r) OC.auto.preparar(r, OC.mochila(r, Math.max(0.5, Number(prefs.horas) || 4)), simulandoOutro() ? pkAnalise().id : null)
+        .then(async (ok) => { if (ok && simulandoOutro()) { prefs.pkUpar = null; salvarPrefs(); } await recalcular(true); desenhar(); });
       desenhar();
     });
     for (const b of painel.querySelectorAll('[data-aba]')) b.addEventListener('click', () => { prefs.aba = b.dataset.aba; salvarPrefs(); desenhar(); });
@@ -645,7 +689,7 @@
   setInterval(() => { if (painel && (prefs.aba === 'sessao' || prefs.aba === 'drops') && !painel.querySelector('input:focus, select:focus')) desenhar(); }, 3000);
   setInterval(() => { if (painel && prefs.aba === 'progresso' && !painel.querySelector('input:focus, select:focus')) desenhar(); }, 15000);
   OC.on('aviso', () => { if (painel && prefs.aba === 'ajustes' && !painel.querySelector('input:focus, select:focus, textarea:focus')) desenhar(); });
-  OC.on('auto', () => { if (painel && (prefs.aba === 'setup' || prefs.aba === 'ajustes') && !painel.querySelector('input:focus, select:focus')) desenhar(); });
+  OC.on('auto', () => { if (painel && (prefs.aba === 'setup' || prefs.aba === 'ajustes' || prefs.aba === 'hunts') && !painel.querySelector('input:focus, select:focus')) desenhar(); });
   OC.ui = { abrir, fechar, desenhar, prefs, salvarPrefs, analiseFresca: async () => { await recalcular(false); return analise; },
     interno: () => ({ welcome, eu, jogo, itens, analise, xpDoTreinador: eu ? xpDoTreinador() : null, ritmo: eu ? ritmoTreinador() : null }) };
 })(globalThis);

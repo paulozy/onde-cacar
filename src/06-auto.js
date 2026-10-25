@@ -45,13 +45,23 @@
   const emArena = () => !eu || eu.casa?.dentro || eu.boss?.arena || eu.mistico || eu.safari;
   function livreParaTrocar() {
     if (emArena()) return { ok: false, motivo: 'fora de hunt (arena, casa ou boss)' };
-    if (Date.now() - campoInitEm < 11000) return { ok: false, motivo: 'esperando os 10 s da última troca' };
+    if (Date.now() - campoInitEm < 11000) return { ok: false, motivo: 'esperando os 10 s da última troca', ate: 11000 - (Date.now() - campoInitEm) };
     if (!eu.huntSlug || eu.noCentro) return { ok: true };
+    const agora = OC.agoraServidor?.() ?? Date.now();
+    const centro = Number(eu.centroLivreEm) || 0;
+    if (agora < centro) return { ok: false, motivo: 'em combate', ate: centro - agora };
+    // O servidor manda, nas mensagens de batalha, o instante exato em que a troca libera
+    // (trocaLivreEm). Quando ele existe, vale ele: XP, abate e loot também chegam como batalha
+    // e não são combate, então contar qualquer batalha como luta prendia a troca para sempre.
+    const tl = Number(OC.trocaLivreEm) || 0;
+    if (tl) return agora < tl ? { ok: false, motivo: 'em combate', ate: tl - agora } : { ok: true };
+    // sem esse aviso: o botão do jogo e, por último, 3,5 s sem mensagens de batalha
     const btn = document.getElementById('ir-centro');
     if (!document.hidden && btn && btn.disabled) return { ok: false, motivo: 'em combate' };
-    if (Date.now() < (Number(OC.trocaLivreEm) || 0) || Date.now() < (Number(eu.centroLivreEm) || 0) || Date.now() - (OC.ultimoCombate || 0) < 3500) return { ok: false, motivo: 'em combate' };
+    if (Date.now() - (OC.ultimoCombate || 0) < 3500) return { ok: false, motivo: 'em combate' };
     return { ok: true };
   }
+  OC.livreParaTrocar = livreParaTrocar;
 
   // ---- compras -------------------------------------------------------------------------------
   const gastoHora = () => { const a = Date.now(); gastos = gastos.filter((g) => a - g.t < 3.6e6); return gastos.reduce((s, g) => s + g.v, 0); };
@@ -101,17 +111,69 @@
     if (!gravando || !ev.isTrusted) return;
     const b = ev.target.closest?.('button, [role="button"], a') || ev.target;
     const txt = `${b.textContent ?? ''} ${b.getAttribute?.('title') ?? ''} ${b.getAttribute?.('aria-label') ?? ''}`;
-    if (!ALVO_SAIDA.test(txt)) return;
+    if (gravando.tipo !== 'ativar' && !ALVO_SAIDA.test(txt)) return;
     gravando.clicouEm = Date.now();
   }, true);
   OC.on('enviado', (raw) => {
     if (!gravando?.clicouEm || Date.now() - gravando.clicouEm > 1500) return;
     let t = null; try { t = JSON.parse(raw)?.t; } catch { return; }
-    if (!t || /^(ping|pong|campo|mov|andar|hunt\.select|shop\.)/i.test(t)) return;
+    if (!t || /^(ping|pong|campo|mov|andar|hunt\.select|shop\.|market|chat|outland\.tier|auto\.)/i.test(t)) return;
+    if (gravando.tipo === 'ativar') { aprenderAtivar(raw, t); return; }
     const p = prefs(); p[`saida_${gravando.tipo}`] = raw; OC.ui?.salvarPrefs?.();
     registrar(`gravei a saída por ${gravando.tipo === 'rope' ? 'Escape Rope' : 'desistência'} (${t})`);
     gravando = null;
   });
+
+  // ---- trocar o pokémon em campo -------------------------------------------------------------
+  // Grava a mensagem que o jogo manda quando você põe um pokémon em campo e descobre qual campo
+  // dela é o id: o que bate com o novo activeId logo depois.
+  function acharCaminho(o, alvo, prof = 0) {
+    if (!o || typeof o !== 'object' || prof > 2) return null;
+    for (const [k, v] of Object.entries(o)) {
+      if (k !== 't' && (v === alvo || String(v) === String(alvo))) return [k];
+      const r = acharCaminho(v, alvo, prof + 1); if (r) return [k, ...r];
+    }
+    return null;
+  }
+  async function aprenderAtivar(raw, t) {
+    const antes = eu?.activeId;
+    gravando = null;
+    const fim = Date.now() + 5000;
+    while (Date.now() < fim && eu?.activeId === antes) await dormir(200);
+    const novo = eu?.activeId;
+    const caminho = novo !== antes ? acharCaminho(JSON.parse(raw), novo) : null;
+    if (!caminho) { registrar(`gravei "${t}", mas o pokémon em campo não mudou ou o id não está na mensagem: grave de novo pondo outro pokémon em campo`, 'erro'); OC.emit('auto', null); return; }
+    const p = prefs(); p.ativar = { raw, caminho, t }; OC.ui?.salvarPrefs?.();
+    registrar(`aprendi a trocar o pokémon em campo (${t})`);
+    OC.emit('auto', null);
+  }
+  async function colocarEmCampo(id) {
+    if (eu?.activeId === id) return true;
+    const a = prefs().ativar;
+    if (!a?.raw || !a.caminho) { registrar('ensine a troca de pokémon primeiro (aba Hunts)', 'erro'); return false; }
+    const m = JSON.parse(a.raw);
+    let o = m; for (const k of a.caminho.slice(0, -1)) o = o[k];
+    const ult = a.caminho[a.caminho.length - 1];
+    o[ult] = typeof o[ult] === 'number' ? Number(id) : String(id);
+    const espera = ultimaAcao + ESPACO_MS - Date.now();
+    if (espera > 0) await dormir(espera);
+    try { OC.socket?.send(JSON.stringify(m)); } catch { return false; }
+    ultimaAcao = Date.now();
+    const fim = Date.now() + 6000;
+    while (Date.now() < fim && eu?.activeId !== id) await dormir(250);
+    const ok = eu?.activeId === id;
+    registrar(ok ? `pokémon em campo trocado` : 'o jogo não trocou o pokémon em campo (ele precisa estar na equipe e no máximo 5 níveis acima do treinador)', ok ? 'info' : 'erro');
+    return ok;
+  }
+  /** Coloca o pokémon em campo e vai para a hunt (o botão da aba Hunts, depois da confirmação). */
+  async function uparEm(id, slug, nome, opts = {}) {
+    if (ocupado) return false;
+    ocupado = true; OC.emit('auto', null);
+    try {
+      if (!(await colocarEmCampo(id))) return false;
+      return await irPara(slug, nome, opts);
+    } finally { ocupado = false; OC.emit('auto', null); }
+  }
 
   async function forcarSaida() {
     const p = prefs(), modo = p.autoForcar;
@@ -132,27 +194,37 @@
     const p = prefs();
     const limiteForcar = Date.now() + Math.max(0.5, Number(p.autoForcarApos) || 2) * 60000;
     const ate = Date.now() + 8 * 60000;
-    let avisou = false, forcou = false;
+    let avisou = false, forcou = false, sugeriu = false, tentativas = 0;
+    const inicio = Date.now();
     while (Date.now() < ate) {
-      const livre = livreParaTrocar();
+      let livre = livreParaTrocar();
       if (livre.ok) {
         const espera = ultimaAcao + ESPACO_MS - Date.now();
-        if (espera > 0) await dormir(espera);
+        if (espera > 0) { await dormir(espera); livre = livreParaTrocar(); }
+      }
+      if (livre.ok) {
         // a Outland é escolhida à parte (outland.tier) e o slug da hunt é o mesmo nas 8
-        if (!tierOk()) { OC.enviar({ t: 'outland.tier', tier: Number(opts.tier) }); await dormir(800); }
+        if (!tierOk()) { OC.enviar({ t: 'outland.tier', tier: Number(opts.tier) }); await dormir(400); }
         OC.enviar({ t: 'hunt.select', slug });
         ultimaAcao = Date.now();
         const fim = Date.now() + 6000;
-        while (Date.now() < fim && !(eu?.huntSlug === slug && tierOk())) await dormir(300);
+        while (Date.now() < fim && !(eu?.huntSlug === slug && tierOk())) await dormir(250);
         if (eu?.huntSlug === slug && tierOk()) { registrar(`agora caçando em ${nome}${opts.tier ? ` (Outland ${opts.tier})` : ''}`); ultimaHunt = Date.now(); return true; }
+        tentativas++;
       } else {
         if (!avisou) { registrar(`esperando para ir a ${nome}: ${livre.motivo}`); avisou = true; }
-        if (!forcou && livre.motivo === 'em combate' && p.autoForcar && p.autoForcar !== 'nao' && Date.now() > limiteForcar) {
-          forcou = true;
-          if (!(await forcarSaida())) registrar('a saída forçada não funcionou: grave o botão de novo em Ajustes', 'erro');
+        if (!forcou && livre.motivo === 'em combate' && Date.now() > limiteForcar) {
+          if (p.autoForcar && p.autoForcar !== 'nao') {
+            forcou = true;
+            if (!(await forcarSaida())) registrar('a saída forçada não funcionou: grave o botão de novo em Ajustes', 'erro');
+          } else if (!sugeriu) {
+            sugeriu = true;
+            registrar(`a troca não liberou em ${Math.round((Date.now() - inicio) / 60000)} min: a hunt não para de lutar. Em Ajustes, a saída forçada (Escape Rope ou desistir) resolve`, 'erro');
+          }
         }
       }
-      await dormir(1500);
+      // dorme até o instante em que o servidor disse que libera (no máximo 3 s por vez)
+      await dormir(livre.ate ? Math.min(3000, Math.max(80, livre.ate + 60)) : 600);
     }
     registrar(`não consegui ir para ${nome}`, 'erro');
     return false;
@@ -163,17 +235,18 @@
     log: () => log,
     status: () => status,
     ocupado: () => ocupado,
-    precoItem, precoBola, irPara,
-    gravarSaida: (tipo) => { gravando = { tipo }; registrar(`gravando: clique agora no botão ${tipo === 'rope' ? 'da Escape Rope' : 'Desistir do combate'} do jogo`); },
+    precoItem, precoBola, irPara, colocarEmCampo, uparEm,
+    gravarSaida: (tipo) => { gravando = { tipo }; registrar(tipo === 'ativar' ? 'gravando: ponha agora, pelo jogo, outro pokémon da equipe em campo' : `gravando: clique agora no botão ${tipo === 'rope' ? 'da Escape Rope' : 'Desistir do combate'} do jogo`); },
     cancelarGravacao: () => { gravando = null; },
     gravando: () => gravando?.tipo ?? null,
-    async preparar(r, lista) {
-      if (ocupado) return;
+    async preparar(r, lista, pkId = null) {
+      if (ocupado) return false;
       ocupado = true;
       try {
         registrar(`preparando ${r.nome}`);
-        if (!(await reabastecer(lista))) return;
-        await irPara(r.slug, r.nome, r.outland ? { tier: r.tierAlvo } : {});
+        if (!(await reabastecer(lista))) return false;
+        if (pkId != null && pkId !== eu?.activeId && !(await colocarEmCampo(pkId))) return false;
+        return await irPara(r.slug, r.nome, r.outland ? { tier: r.tierAlvo } : {});
       } finally { ocupado = false; OC.emit('auto', null); }
     },
   };
@@ -184,6 +257,7 @@
     if (ocupado || !eu || !welcome || emArena() || !(p.autoRepor || p.autoTrocar)) return;
     const a = await OC.ui?.analiseFresca?.();
     if (!a) return;
+    if (a.P && OC.ui?.prefs?.pkUpar && OC.ui.prefs.pkUpar !== eu.activeId) return; // a análise é de outro pokémon
     const aqui = a.linhas.find((l) => l.slug === eu.huntSlug && !l.inviavel);
     ocupado = true;
     try {

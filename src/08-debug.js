@@ -66,7 +66,7 @@
 
     return limpar({
       gerado_em: new Date().toISOString(),
-      extensao: '2.2.0',
+      extensao: '2.3.0',
       jogo_versao: jogo?.versao ?? null,
       navegador: navigator.userAgent,
       modulos: jogo?.mod ? Object.fromEntries(Object.entries(jogo.mod).map(([k, m]) => [k, Object.keys(m ?? {}).length ? Object.keys(m).slice(0, 12) : 'NÃO CARREGOU'])) : jogo,
@@ -91,6 +91,8 @@
         chaves_welcome_parecidas: Object.keys(welcome ?? {}).filter((k) => /sazon|dia|tipo/i.test(k)) },
       saida_forcada: { modo: OC.ui?.prefs?.autoForcar ?? 'nao', rope: (() => { try { return JSON.parse(OC.ui?.prefs?.saida_rope)?.t ?? null; } catch { return null; } })(),
         desistir: (() => { try { return JSON.parse(OC.ui?.prefs?.saida_desistir)?.t ?? null; } catch { return null; } })() },
+      troca: { relogio_servidor_ms: OC.offsetServidor ?? null, troca_livre_em: OC.trocaLivreEm ?? null, livre_agora: OC.livreParaTrocar?.() ?? null,
+        sabe_trocar_pokemon: OC.ui?.prefs?.ativar ? { t: OC.ui.prefs.ativar.t, campo: OC.ui.prefs.ativar.caminho } : null, simulando: OC.ui?.prefs?.pkUpar ?? null },
       outland: { tier_atual: eu?.outlandTier ?? null, tiers_do_jogo: welcome?.outlandTiers ?? null, chance_token_do_jogo: welcome?.chanceBossToken ?? null, raros_usados: analise?.raros ?? null },
       catalogo_campos: (() => {
         // para conferir de onde sai o estágio de evolução (chance de captura e nível ao capturar)
