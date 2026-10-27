@@ -73,6 +73,7 @@
       }
     }
     else if (cab.includes('"t":"erro"')) tipo = 'erro';
+    else if (/"t":"[^"]*(sazon|clima|tipo_?do_?dia)/i.test(cab)) tipo = 'sazonal';
     else if (cab.includes('"t":"batalha"')) {
       OC.ultimoCombate = Date.now();
       // o próprio jogo avisa quando a troca de área fica livre
@@ -94,6 +95,7 @@
     } else if (tipo === 'batalha') {
       for (const e of Array.isArray(m.ev) ? m.ev : []) OC.emit('batalha.ev', e);
     } else {
+      if (/sazon|tipo_?do_?dia|clima/i.test(tipo)) OC.ultimoSazonal = { ...m, recebidoEm: Date.now() };
       OC.emit(tipo, m);
     }
   }

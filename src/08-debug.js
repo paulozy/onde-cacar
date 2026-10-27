@@ -66,7 +66,7 @@
 
     return limpar({
       gerado_em: new Date().toISOString(),
-      extensao: '2.3.0',
+      extensao: '2.3.1',
       jogo_versao: jogo?.versao ?? null,
       navegador: navigator.userAgent,
       modulos: jogo?.mod ? Object.fromEntries(Object.entries(jogo.mod).map(([k, m]) => [k, Object.keys(m ?? {}).length ? Object.keys(m).slice(0, 12) : 'NÃO CARREGOU'])) : jogo,
@@ -87,7 +87,7 @@
         outros_numeros: Object.fromEntries(Object.entries(eu).filter(([, v]) => typeof v === 'number')),
       },
       pokemon_ativo: pk,
-      dia_sazonal: { do_jogo: OC.tipoDoDia?.({ welcome, eu }) ?? null, ajuste: OC.ui?.prefs?.tipoDiaManual ?? 'auto',
+      dia_sazonal: { do_jogo: OC.tipoDoDia?.({ welcome, eu }) ?? null, mensagem_do_jogo: OC.ultimoSazonal ?? null, proxima_virada: OC.proximaViradaSazonal ? new Date(OC.proximaViradaSazonal()).toISOString() : null, ajuste: OC.ui?.prefs?.tipoDiaManual ?? 'auto',
         chaves_welcome_parecidas: Object.keys(welcome ?? {}).filter((k) => /sazon|dia|tipo/i.test(k)) },
       saida_forcada: { modo: OC.ui?.prefs?.autoForcar ?? 'nao', rope: (() => { try { return JSON.parse(OC.ui?.prefs?.saida_rope)?.t ?? null; } catch { return null; } })(),
         desistir: (() => { try { return JSON.parse(OC.ui?.prefs?.saida_desistir)?.t ?? null; } catch { return null; } })() },

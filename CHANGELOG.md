@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.3.1 — 27/10/2026
+
+Ajustes para a Wiki de 27/10/2026.
+
+- **Dias Sazonais:** a tipagem do dia agora troca às **18:00 de Brasília**. A extensão segue a troca sem recarregar: lê a mensagem do jogo sobre o dia e, se ela não vier, o ícone do dia na tela da hunt. A escolha manual em Ajustes vale só até a próxima virada.
+- **Diamante:** o Mercado deixou de negociar diamante. O campo dos Ajustes passou a ser "quanto vale 1 💎 para você", pelo que você paga na Loja.
+- **Boost do Sacrifício** (+20% de XP no treinador e no pokémon) entra no ritmo de XP.
+- Alvo padrão do Boost dos Atrasados atualizado para o nv 941 (só vale quando o jogo não informa).
+
 ## 2.3.0 — 25/10/2026
 
 ### Novo

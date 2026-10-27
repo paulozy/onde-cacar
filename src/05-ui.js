@@ -11,7 +11,7 @@
     aba: 'hunts', ordem: 'xp', soLiberadas: true, esconderPerigo: true,
     pocao: 'auto', bola: 'auto', vender: true, bike: 0, precoBeast: 100, hpMinimo: 0.35, horas: 4, sel: null,
     autoRepor: false, autoTrocar: false, autoMinHoras: 1, autoReserva: 1000000, autoTetoHora: 3000000,
-    precoDiamante: 7, alvoAtrasados: 870, contarLive: false, avisoSom: false, avisoPotMin: 3, avisoQualMin: 1.5, avisoIvMin: 150,
+    precoDiamante: 7, alvoAtrasados: 941, contarLive: false, avisoSom: false, avisoPotMin: 3, avisoQualMin: 1.5, avisoIvMin: 150,
     ...lerJ(CHAVE_PREFS, {}),
   };
   if (prefs.aba === 'comprar') prefs.aba = 'alvo'; // a aba Comprar saiu na 2.1
@@ -53,7 +53,7 @@
   async function recalcular(forcar = false) {
     const pk = pkAnalise();
     if (!welcome || !eu || !pk) { analise = null; return; }
-    const sig = assinar(pk) + JSON.stringify([prefs.ordem, prefs.pocao, prefs.bola, prefs.vender, prefs.bike, prefs.hpMinimo, prefs.precoBeast, prefs.tipoDiaManual, prefs.precoToken, prefs.precoFragChave, prefs.precoFragShiny, prefs.precoFragBike]);
+    const sig = assinar(pk) + JSON.stringify([prefs.ordem, prefs.pocao, prefs.bola, prefs.vender, prefs.bike, prefs.hpMinimo, prefs.precoBeast, prefs.tipoDiaManual, prefs.tipoDiaManualAte, OC.proximaViradaSazonal?.(), OC.tipoDoDia?.({ welcome, eu }), prefs.precoToken, prefs.precoFragChave, prefs.precoFragShiny, prefs.precoFragBike]);
     if (!forcar && analise && sig === assinatura) return;
     try {
       jogo ??= await OC.carregarJogo();
@@ -384,7 +384,7 @@
       <label class="oc-chk"><input type="checkbox" data-pref="vender" ${prefs.vender ? 'checked' : ''}> Vendo as capturas no NPC</label>
       <label>Quanto custa uma Beast Ball para você (ouro)<input type="number" min="0" step="100" value="${Number(prefs.precoBeast) || 0}" data-pref-num="precoBeast" class="oc-num"></label>
       <label>Bicicleta<select data-pref-sel="bike">${[[0, 'Sem bicicleta'], [0.15, 'Comum (+15%)'], [0.25, 'Incomum (+25%)'], [0.5, 'Rara (+50%)'], [0.75, 'Mítica (+75%)'], [1, 'Lendária (+100%)']].map(([v, r]) => opt(v, r, prefs.bike)).join('')}</select></label>
-      <label>Tipagem do dia (Dias Sazonais)<select data-pref-sel="tipoDiaManual">${opt('auto', OC.tipoDoDia?.({ welcome, eu }) ? `Do jogo: ${TIPO[OC.tipoDoDia({ welcome, eu })]}` : 'Do jogo (se ele informar)', prefs.tipoDiaManual ?? 'auto')}${opt('nenhum', 'Ignorar', prefs.tipoDiaManual)}${Object.entries(TIPO).map(([k, r]) => opt(k, r, prefs.tipoDiaManual)).join('')}</select></label>
+      <label>Tipagem do dia (troca às 18:00)${prefs.tipoDiaManual && prefs.tipoDiaManual !== 'auto' && prefs.tipoDiaManualAte ? ` <small>· sua escolha vale até ${new Date(prefs.tipoDiaManualAte).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</small>` : ''}<select data-pref-sel="tipoDiaManual">${opt('auto', OC.tipoDoDia?.({ welcome, eu }) ? `Do jogo: ${TIPO[OC.tipoDoDia({ welcome, eu })]}` : 'Do jogo (se ele informar)', prefs.tipoDiaManual ?? 'auto')}${opt('nenhum', 'Ignorar', prefs.tipoDiaManual)}${Object.entries(TIPO).map(([k, r]) => opt(k, r, prefs.tipoDiaManual)).join('')}</select></label>
       <label>Nunca deixar o HP cair abaixo de<select data-pref-sel="hpMinimo">${[[0.25, '25%'], [0.35, '35%'], [0.5, '50%'], [0.65, '65%']].map(([v, r]) => opt(v, r, prefs.hpMinimo)).join('')}</select></label>
       </div>
       <h4 class="oc-sub">Diagnóstico</h4>
@@ -407,7 +407,7 @@
       ${OC.avisos?.historico().length ? `<div class="oc-caixa">${OC.avisos.historico().slice(0, 8).map((a) => `<div>${new Date(a.t).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} <b>${esc(a.titulo)}</b> ${esc(a.texto)}</div>`).join('')}</div>` : ''}
       <h4 class="oc-sub">Valores de referência</h4>
       <div class="oc-form">
-      <label>Gemas por diamante no Mercado<input type="number" class="oc-num" min="1" step="0.5" value="${prefs.precoDiamante}" data-pref-num="precoDiamante"></label>
+      <label>Quanto vale 1 💎 para você (Gemas) <small>· o Mercado não negocia mais diamante: use o que você paga na Loja (1 Gema = US$ 0,01)</small><input type="number" class="oc-num" min="1" step="0.5" value="${prefs.precoDiamante}" data-pref-num="precoDiamante"></label>
       <label>Bronze Boss Token no Mercado (Coins)<input type="number" class="oc-num" min="0" step="10000" value="${Number(prefs.precoToken) || 0}" data-pref-num="precoToken"></label>
       <label>Fragmento de Chave (Coins)<input type="number" class="oc-num" min="0" step="10000" value="${Number(prefs.precoFragChave) || 0}" data-pref-num="precoFragChave"></label>
       <label>Fragmento de Shiny Stone (Coins)<input type="number" class="oc-num" min="0" step="10000" value="${Number(prefs.precoFragShiny) || 0}" data-pref-num="precoFragShiny"></label>
@@ -529,7 +529,7 @@
       <div class="oc-caixa" style="margin-top:8px">${ativo
         ? `<b>Boost dos Atrasados ativo</b>: XP ×10 até o nv ${num(alvo)}. O ritmo acima já conta com ele.`
         : L >= alvo ? 'Você já passou do nível dos veteranos: o Boost dos Atrasados não se aplica.'
-        : `<b>Boost dos Atrasados</b> até o nv ${num(alvo)}: ~<b>${num(preco)} 💎</b>${preco === 50 ? ' (o preço mínimo)' : ''} no seu nível (pela fórmula da Wiki; o card da Loja mostra o valor exato), ~${num(gemas)} Gemas (~US$ ${dec(gemas / 100, 2)}) com o diamante a ${num(prefs.precoDiamante)} Gemas.`}</div>
+        : `<b>Boost dos Atrasados</b> até o nv ${num(alvo)}: ~<b>${num(preco)} 💎</b>${preco === 50 ? ' (o preço mínimo)' : ''} no seu nível (pela fórmula da Wiki; o card da Loja mostra o valor exato), ~${num(gemas)} Gemas (~US$ ${dec(gemas / 100, 2)}) contando o diamante a ${num(prefs.precoDiamante)} Gemas (o valor dos Ajustes).`}</div>
       <p class="oc-nota">Cada boost conta só até vencer. Conforme você sobe, abrem hunts melhores e o ritmo cresce, então os tempos longos tendem a ser menores. O alvo do Atrasados é recalculado todo dia pelo jogo (${alvoJogo ? `hoje: nv ${num(alvo)}, mediana de ${num(Number(eu.loja?.alvoAtrasadosN) || 0)} veteranos, lido do jogo` : `usando ${num(alvo)}; ajuste em Ajustes`}).</p>`;
   }
 
@@ -663,7 +663,10 @@
     for (const b of painel.querySelectorAll('[data-sel]')) b.addEventListener('click', () => { prefs.sel = b.dataset.sel || null; prefs.aba = 'setup'; salvarPrefs(); desenhar(); });
     for (const c of painel.querySelectorAll('[data-pref]')) c.addEventListener('change', async () => { prefs[c.dataset.pref] = c.checked; salvarPrefs(); if (c.dataset.pref === 'vender') await recalcular(true); desenhar(); });
     for (const s of painel.querySelectorAll('[data-pref-sel]')) s.addEventListener('change', async () => {
-      const k = s.dataset.prefSel; prefs[k] = ['bike', 'hpMinimo', 'avisoPotMin', 'avisoQualMin', 'avisoIvMin'].includes(k) ? Number(s.value) : s.value; salvarPrefs(); await recalcular(true); desenhar();
+      const k = s.dataset.prefSel; prefs[k] = ['bike', 'hpMinimo', 'avisoPotMin', 'avisoQualMin', 'avisoIvMin'].includes(k) ? Number(s.value) : s.value;
+      // a escolha manual da tipagem vale só até a próxima virada (18:00 de Brasília)
+      if (k === 'tipoDiaManual') prefs.tipoDiaManualAte = s.value === 'auto' ? null : OC.proximaViradaSazonal();
+      salvarPrefs(); await recalcular(true); desenhar();
     });
     for (const i of painel.querySelectorAll('[data-pref-num]')) i.addEventListener('change', async () => {
       const k = i.dataset.prefNum; prefs[k] = k === 'horas' ? (Number(i.value) || 4) : k === 'autoForcarApos' ? Math.max(0.5, Number(i.value) || 2) : Math.max(0, Number(i.value) || 0); salvarPrefs();

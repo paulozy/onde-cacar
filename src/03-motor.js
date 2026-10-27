@@ -111,12 +111,16 @@
       if (boost('xp') > 1) itens.push({ nome: 'XP Boost', mult: boost('xp'), quem: 'tr' });
       if (boost('pokexp') > 1) { itens.push({ nome: 'XP Boost Pokémon', mult: boost('pokexp'), quem: 'pk' }); conhecido *= boost('pokexp'); }
       if (Number(eu?.guildBonusPct) > 0) { itens.push({ nome: 'Guild', mult: 1 + eu.guildBonusPct / 100, quem: 'ambos' }); conhecido *= 1 + eu.guildBonusPct / 100; }
-      if (pk / conhecido > 1.005) itens.push({ nome: 'Outros do jogo (Boost da Guild, ranking…)', mult: pk / conhecido, quem: 'ambos' });
+      if (pk / conhecido > 1.005) itens.push({ nome: 'Outros do jogo (Boost da Guild, Sacrifício, ranking…)', mult: pk / conhecido, quem: 'ambos' });
     } else {
       if (vip) somar('VIP', 1.5, 'ambos');
       somar('XP Boost', boost('xp'), 'tr');
       somar('XP Boost Pokémon', boost('pokexp'), 'pk');
       if (Number(eu?.guildBonusPct) > 0) somar('Guild', 1 + eu.guildBonusPct / 100, 'ambos');
+      // Wiki: Boost do Sacrifício, +20% no treinador e no pokémon, resgatado no altar da Mochila
+      for (const [ch, ate] of Object.entries(l.boosts ?? {})) if (/sacrif/i.test(ch) && agora < Number(ate)) somar('Sacrifício', tipos.find((b) => b.chave === ch)?.mult ?? 1.2, 'ambos');
+      const sac = eu?.sacrificio ?? l.sacrificio;
+      if (sac && agora < (Number(sac.ate ?? sac.boostAte ?? sac.expira) || 0) && !itens.some((i) => i.nome === 'Sacrifício')) somar('Sacrifício', 1.2, 'ambos');
     }
     const tw = eu?.twitch;
     if (tw?.assistindo && Number(tw.pctAtual) > 0) somar('Twitch', 1 + tw.pctAtual / 100, 'ambos');
@@ -271,6 +275,11 @@
     return Math.max(piso, Math.min(teto, base * (forca / fator) * 1.4)); // corpo caído: HP 0 → ×1,4
   }
   OC.chanceCaptura = chanceCaptura;
+  /** Próxima troca da tipagem do dia: 18:00 de Brasília = 21:00 UTC. */
+  OC.proximaViradaSazonal = (agora = Date.now()) => {
+    const d = new Date(agora); d.setUTCHours(21, 0, 0, 0);
+    return d.getTime() <= agora ? d.getTime() + 864e5 : d.getTime();
+  };
   // Wiki: o valorBase da venda ao NPC tem teto de 64.907 (a base de uma espécie da hunt nível 2.500)
   function tetoValorBase(ctx) {
     const e = ctx.welcome?.economia ?? {};
@@ -445,8 +454,30 @@
   const perigosa = (r) => r.umHit || r.mortesH >= 0.5 || r.hitPct >= 0.5;
   OC.perigosa = perigosa;
 
-  /** A tipagem do Dia Sazonal, se o jogo mandar em algum campo do welcome ou do estado. */
+  /** A tipagem do Dia Sazonal. Wiki: sorteada todo dia às 18:00 de Brasília. Procura, do mais novo
+   *  para o mais velho: a mensagem do jogo sobre o dia, o estado, o welcome e, por último, o ícone do
+   *  dia na tela da hunt (pelo nome do dia). */
   const TIPOS18 = new Set(Object.keys(PEDRA));
+  const NOMES_DIA = [['Céu Limpo', 'NORMAL'], ['Escaldante', 'FIRE'], ['Chuvoso', 'WATER'], ['Florido', 'GRASS'], ['de Tempestade', 'ELECTRIC'],
+    ['de Nevasca', 'ICE'], ['de Treino', 'FIGHTING'], ['Tóxico', 'POISON'], ['de Terremoto', 'GROUND'], ['de Ventania', 'FLYING'], ['Telepático', 'PSYCHIC'],
+    ['do Enxame', 'BUG'], ['de Avalanche', 'ROCK'], ['Assombrado', 'GHOST'], ['do Dragão', 'DRAGON'], ['Noite Eterna', 'DARK'], ['da Forja', 'STEEL'], ['Encantado', 'FAIRY']];
+  let domCache = { em: 0, tipo: null };
+  function tipoDoDiaNaTela() {
+    if (typeof document === 'undefined') return null;
+    if (Date.now() - domCache.em < 60000) return domCache.tipo;
+    let tipo = null;
+    try {
+      for (const el of document.querySelectorAll('[title],[alt],[aria-label],[data-tip],[data-tooltip]')) {
+        if (el.closest?.('.oc-painel')) continue;
+        const txt = [el.getAttribute('title'), el.getAttribute('alt'), el.getAttribute('aria-label'), el.getAttribute('data-tip'), el.getAttribute('data-tooltip')].join(' ');
+        if (!/\bDia\b|Noite Eterna/.test(txt)) continue;
+        const achou = NOMES_DIA.find(([n]) => txt.includes(n.startsWith('d') ? `Dia ${n}` : n));
+        if (achou) { tipo = achou[1]; break; }
+      }
+    } catch { /* tela sem o ícone */ }
+    domCache = { em: Date.now(), tipo };
+    return tipo;
+  }
   OC.tipoDoDia = (ctx) => {
     const busca = (o, prof = 0) => {
       if (!o || typeof o !== 'object' || prof > 2) return null;
@@ -459,7 +490,7 @@
       }
       return null;
     };
-    return busca(ctx.welcome) ?? busca(ctx.eu);
+    return busca({ sazonal: OC.ultimoSazonal }) ?? busca(OC.ultimoSazonal) ?? busca(ctx.eu) ?? busca(ctx.welcome) ?? tipoDoDiaNaTela();
   };
 
   /** Analisa todas as hunts para o pokémon em campo. */
@@ -478,6 +509,7 @@
     const tiers = OC.tiersOutland(ctx);
     op.degrauOutland = tiers.atual.mult;
     const raros = OC.raros(ctx);
+    if (op.tipoDiaManualAte && Date.now() > op.tipoDiaManualAte) op.tipoDiaManual = 'auto'; // o dia virou às 18:00
     op.tipoDia = (op.tipoDiaManual && op.tipoDiaManual !== 'auto') ? (op.tipoDiaManual === 'nenhum' ? null : op.tipoDiaManual) : (OC.tipoDoDia?.(ctx) ?? null);
     const t0 = performance.now();
     const linhas = [];
