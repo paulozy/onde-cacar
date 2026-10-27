@@ -14,7 +14,9 @@
 
   const ESPACO_MS = 3000;          // entre dois pedidos ao Mercado
   const CICLO_MS = 20000;          // cada alvo é olhado a cada 20 s (a retenção é de 120 s)
-  const JANELA_MS = [400, 2200];   // depois da liberação: dentro dos 3 s do sorteio
+  // depois da liberação: no meio dos 3 s do sorteio, com folga dos dois lados para o erro do relógio
+  // (cedo demais o anúncio ainda está retido; tarde demais o sorteio já fechou)
+  const JANELA_MS = [800, 1800];
   const MEDIAS_MS = 30 * 60000;    // médias de 7 dias: relidas a cada 30 min
   const CATEGORIAS = [['stone', 'Pedras'], ['fragment', 'Fragmentos'], ['boss', 'Boss Tokens'], ['ticket', 'Tickets']];
 
@@ -170,12 +172,27 @@
     }
   }
 
+  // A aba escondida há mais de 5 min faz o navegador acordar timers só 1× por minuto, o que
+  // perderia o sorteio. Por isso a hora da compra é conferida também a cada mensagem do jogo (o
+  // mapa da hunt chega a cada ~250 ms e não sofre esse freio); o timer fica só de reserva.
   function agendar(l, a) {
     if (agendados.has(l.id) || enviados.has(l.id)) return;
     const jitter = JANELA_MS[0] + Math.random() * (JANELA_MS[1] - JANELA_MS[0]);
-    const daqui = Math.max(0, (Number(l.compravelEm) || 0) - agoraSrv()) + jitter;
-    agendados.set(l.id, setTimeout(() => { agendados.delete(l.id); comprar(l, a).catch((e) => registrar(`erro na compra: ${e.message}`, 'erro')); }, daqui));
+    const quando = Math.max(Number(l.compravelEm) || 0, agoraSrv()) + jitter;
+    const disparar = () => {
+      const x = agendados.get(l.id);
+      if (!x) return;
+      clearTimeout(x.timer); agendados.delete(l.id);
+      comprar(l, a).catch((e) => registrar(`erro na compra: ${e.message}`, 'erro'));
+    };
+    agendados.set(l.id, { quando, disparar, timer: setTimeout(disparar, Math.max(0, quando - agoraSrv())) });
   }
+  function conferirAgenda() {
+    if (!agendados.size) return;
+    const agora = agoraSrv();
+    for (const x of [...agendados.values()]) if (agora >= x.quando) x.disparar();
+  }
+  for (const ev of ['campo', 'estado', 'market', 'batalha.ev', 'campo.init']) OC.on(ev, conferirAgenda);
 
   async function comprar(l, a) {
     const p = prefs();
@@ -192,7 +209,11 @@
     gasto()[l.moeda] += preco * qtd; salvar();   // reservado; volta se a compra não sair
     ouvirDepois();
     OC.enviar({ t: 'market.comprar', id: l.id, qtd, preco, moeda: l.moeda, sorteioUi: 1 });
-    registrar(`pedi ${qtd}× ${l.ficha?.nome ?? a.nome} a ${OC.mercado.preco(preco, l.moeda)}`);
+    const atraso = (agoraSrv() - (Number(l.compravelEm) || 0)) / 1000;
+    const quando = !l.compravelEm ? '' : atraso < 0 ? ` (${(-atraso).toFixed(1)} s antes de liberar: cedo demais)`
+      : atraso <= 3 ? ` (${atraso.toFixed(1)} s depois de liberar, dentro do sorteio)` : ` (${atraso.toFixed(1)} s depois de liberar: fora do sorteio, só leva se sobrar)`;
+    registrar(`pedi ${qtd}× ${l.ficha?.nome ?? a.nome} a ${OC.mercado.preco(preco, l.moeda)}${quando}`, atraso > 3 || atraso < 0 ? 'erro' : 'info');
+    if (atraso > 3) OC.avisos?.avisar?.('mercado-atraso', 'Mercado: pedido atrasado', 'O pedido saiu depois do sorteio. Deixe a conta numa hunt (o relógio e o gatilho vêm das mensagens do mapa) e tire o pokeidle.io das guias em suspensão.', 600000);
     // o sorteio fecha 3 s depois da liberação; depois disso o saldo diz se levou
     const decide = Math.max(Date.now(), Date.now() + ((Number(l.compravelEm) || 0) + 3000 - agoraSrv())) + 6000;
     let levou = false;
@@ -297,7 +318,8 @@
     categorias: CATEGORIAS,
     lerMedias: () => lerMedias(true),
     preco: (v, moeda) => (moeda === 'orb' ? `${Number(v).toLocaleString('pt-BR')} Gemas` : `${Number(v).toLocaleString('pt-BR')} Coins`),
-    cancelarAgendados: () => { for (const t of agendados.values()) clearTimeout(t); agendados.clear(); },
-    _checar: checar, _comprar: comprar, _ciclo: ciclo, // para testes
+    cancelarAgendados: () => { for (const x of agendados.values()) clearTimeout(x.timer); agendados.clear(); },
+    relogioOk: () => OC.offsetServidor != null,
+    _checar: checar, _comprar: comprar, _ciclo: ciclo, _agendarTeste: agendar, // para testes
   };
 })(globalThis);

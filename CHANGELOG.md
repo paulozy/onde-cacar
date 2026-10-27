@@ -4,7 +4,7 @@
 
 ### Novo
 - **Aba Mercado (alvos de compra):** escolha um item ou um pokémon (espécie e filtros de potência, IV, qualidade, nota, nível e shiny), o preço máximo e a moeda. A extensão olha cada alvo a cada ~20 s e avisa quando aparece algo dentro do preço.
-- **Comprar sozinho**, alvo por alvo: um pedido por anúncio, logo depois da liberação, dentro dos 3 s do sorteio, com o preço visto (a trava de preço do jogo recusa se o vendedor subir).
+- **Comprar sozinho**, alvo por alvo: um pedido por anúncio, entre 0,8 e 1,8 s depois da liberação, no meio dos 3 s do sorteio, com o preço visto (a trava de preço do jogo recusa se o vendedor subir). O gatilho vem das mensagens do mapa da hunt, então funciona mesmo com a aba em segundo plano, quando o navegador freia os timers. O registro diz quando cada pedido saiu em relação à liberação.
 - **Travas:** limite de gasto por dia em Coins; compra em Gemas desligada até você ligar, com limite próprio; quantidade total por alvo; espera enquanto o Mercado do jogo está aberto na sua tela.
 - **Média de 7 dias** de cada item na tabela, e o preço do token e dos fragmentos da visão Outland preenchido pela média do Mercado.
 
