@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.4.0 — 27/10/2026
+
+### Novo
+- **Aba Mercado (alvos de compra):** escolha um item ou um pokémon (espécie e filtros de potência, IV, qualidade, nota, nível e shiny), o preço máximo e a moeda. A extensão olha cada alvo a cada ~20 s e avisa quando aparece algo dentro do preço.
+- **Comprar sozinho**, alvo por alvo: um pedido por anúncio, logo depois da liberação, dentro dos 3 s do sorteio, com o preço visto (a trava de preço do jogo recusa se o vendedor subir).
+- **Travas:** limite de gasto por dia em Coins; compra em Gemas desligada até você ligar, com limite próprio; quantidade total por alvo; espera enquanto o Mercado do jogo está aberto na sua tela.
+- **Média de 7 dias** de cada item na tabela, e o preço do token e dos fragmentos da visão Outland preenchido pela média do Mercado.
+
+### Corrigido
+- O diagnóstico esconde também quem capturou, quem vende e quem compra.
+
 ## 2.3.1 — 27/10/2026
 
 Ajustes para a Wiki de 27/10/2026.

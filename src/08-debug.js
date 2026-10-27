@@ -4,7 +4,7 @@
   'use strict';
   const OC = (root.__ondeCacar ??= {});
 
-  const OCULTAR = /^(nick|nome_?treinador|email|e-?mail|senha|password|token|auth|cpf|carteira|wallet|endereco|address|ip|telefone|phone|referral|codigo|code|chave_?pix)$/i;
+  const OCULTAR = /^(nick|nome_?treinador|caughtBy|capturadoPor|vendedor|vendedorId|comprador|compradorId|email|e-?mail|senha|password|token|auth|cpf|carteira|wallet|endereco|address|ip|telefone|phone|referral|codigo|code|chave_?pix)$/i;
   /** Cópia segura: tira dados pessoais, corta listas e textos longos, limita a profundidade. */
   function limpar(v, prof = 0) {
     if (v == null || typeof v === 'number' || typeof v === 'boolean') return v;
@@ -66,7 +66,7 @@
 
     return limpar({
       gerado_em: new Date().toISOString(),
-      extensao: '2.3.1',
+      extensao: '2.4.0',
       jogo_versao: jogo?.versao ?? null,
       navegador: navigator.userAgent,
       modulos: jogo?.mod ? Object.fromEntries(Object.entries(jogo.mod).map(([k, m]) => [k, Object.keys(m ?? {}).length ? Object.keys(m).slice(0, 12) : 'NÃO CARREGOU'])) : jogo,
@@ -91,6 +91,7 @@
         chaves_welcome_parecidas: Object.keys(welcome ?? {}).filter((k) => /sazon|dia|tipo/i.test(k)) },
       saida_forcada: { modo: OC.ui?.prefs?.autoForcar ?? 'nao', rope: (() => { try { return JSON.parse(OC.ui?.prefs?.saida_rope)?.t ?? null; } catch { return null; } })(),
         desistir: (() => { try { return JSON.parse(OC.ui?.prefs?.saida_desistir)?.t ?? null; } catch { return null; } })() },
+      mercado: OC.mercado ? { status: OC.mercado.status(), alvos: (OC.ui?.prefs?.mercadoAlvos ?? []).map((a) => ({ tipo: a.tipo, nome: a.nome, teto: a.teto, moeda: a.moeda, modo: a.modo, ativo: a.ativo, comprados: a.comprados })), registro: OC.mercado.registro().slice(0, 15), depois_da_compra: OC.mercado.posCompra() } : null,
       troca: { relogio_servidor_ms: OC.offsetServidor ?? null, troca_livre_em: OC.trocaLivreEm ?? null, livre_agora: OC.livreParaTrocar?.() ?? null,
         sabe_trocar_pokemon: OC.ui?.prefs?.ativar ? { t: OC.ui.prefs.ativar.t, campo: OC.ui.prefs.ativar.caminho } : null, simulando: OC.ui?.prefs?.pkUpar ?? null },
       outland: { tier_atual: eu?.outlandTier ?? null, tiers_do_jogo: welcome?.outlandTiers ?? null, chance_token_do_jogo: welcome?.chanceBossToken ?? null, raros_usados: analise?.raros ?? null },

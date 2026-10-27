@@ -73,6 +73,7 @@
       }
     }
     else if (cab.includes('"t":"erro"')) tipo = 'erro';
+    else if (cab.includes('"t":"market"')) tipo = 'market';
     else if (/"t":"[^"]*(sazon|clima|tipo_?do_?dia)/i.test(cab)) tipo = 'sazonal';
     else if (cab.includes('"t":"batalha"')) {
       OC.ultimoCombate = Date.now();

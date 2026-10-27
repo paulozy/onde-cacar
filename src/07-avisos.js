@@ -39,6 +39,7 @@
   }
 
   OC.avisos = {
+    avisar,
     historico: () => historico,
     permissao: () => root.Notification?.permission ?? 'indisponível',
     pedir: async () => { try { return await root.Notification?.requestPermission(); } catch { return 'denied'; } },

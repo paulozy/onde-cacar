@@ -17,6 +17,7 @@ O QUE ELE FAZ
 • Hunts: simula o seu pokémon em campo em todas as hunts liberadas, com XP por hora, ouro líquido, tempo por abate, abates por hora e o pior golpe de cada selvagem. A melhor fica em destaque.
 • Outland: a melhor das 58 hunts para farmar Bronze Boss Token e fragmentos, na Outland mais alta que você liberou, com o valor por hora pelos preços que você informar.
 • Upar outro pokémon: simule as hunts para qualquer pokémon da equipe e, se quiser, deixe a extensão colocá-lo em campo e levar você para a melhor hunt.
+• Mercado: alvos de compra com preço máximo, aviso quando aparece algo barato e compra opcional dentro da janela do sorteio, com limite de gasto por dia.
 • Setup: a poção mais barata para cada hunt e em que % do HP ligar a cura, a pokébola de melhor saldo e quanto levar na mochila para as horas que você vai jogar.
 • Sessão: mede o seu ritmo real e compara com a estimativa. Depois de 15 minutos, o ranking passa a usar o que você mediu.
 • Drops: quanto caiu de cada pedra e quanto deveria ter caído, pela regra do jogo.

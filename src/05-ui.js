@@ -11,6 +11,7 @@
     aba: 'hunts', ordem: 'xp', soLiberadas: true, esconderPerigo: true,
     pocao: 'auto', bola: 'auto', vender: true, bike: 0, precoBeast: 100, hpMinimo: 0.35, horas: 4, sel: null,
     autoRepor: false, autoTrocar: false, autoMinHoras: 1, autoReserva: 1000000, autoTetoHora: 3000000,
+    mercadoLigado: false, mercadoLimiteGold: 50000000, mercadoGemas: false, mercadoLimiteOrb: 0, precoOutlandDoMercado: true,
     precoDiamante: 7, alvoAtrasados: 941, contarLive: false, avisoSom: false, avisoPotMin: 3, avisoQualMin: 1.5, avisoIvMin: 150,
     ...lerJ(CHAVE_PREFS, {}),
   };
@@ -129,7 +130,8 @@
       await recalcular(forcar);
       if (!painel) return;
     }
-    const corpo = erro ? `<div class="oc-aviso">Não consegui calcular: ${esc(erro)}</div>`
+    const corpo = prefs.aba === 'mercado' ? abaMercado()
+      : erro ? `<div class="oc-aviso">Não consegui calcular: ${esc(erro)}</div>`
       : prefs.aba === 'setup' ? abaSetup()
       : prefs.aba === 'sessao' ? abaSessao()
       : prefs.aba === 'drops' ? abaDrops()
@@ -149,7 +151,7 @@
       <button type="button" class="oc-fechar" data-acao="fechar" aria-label="Fechar">×</button></div>`;
   }
   function abas() {
-    const A = [['hunts', 'Hunts'], ['setup', 'Setup'], ['sessao', 'Sessão'], ['drops', 'Drops'], ['progresso', 'Progresso'], ['alvo', 'Capturar'], ['ajustes', 'Ajustes']];
+    const A = [['hunts', 'Hunts'], ['setup', 'Setup'], ['sessao', 'Sessão'], ['drops', 'Drops'], ['progresso', 'Progresso'], ['alvo', 'Capturar'], ['mercado', 'Mercado'], ['ajustes', 'Ajustes']];
     return `<div class="oc-abas" role="tablist">${A.map(([k, r]) => `<button type="button" role="tab" data-aba="${k}" aria-selected="${prefs.aba === k}">${r}</button>`).join('')}</div>`;
   }
 
@@ -390,7 +392,7 @@
       <h4 class="oc-sub">Diagnóstico</h4>
       <div class="oc-caixa">Junta o que a extensão está lendo do jogo e as contas dela (seu pokémon, a hunt atual, bônus, XP, a sessão), sem nick nem dados de conta, para conferir se está tudo certo.
         <div class="oc-ctrl" style="margin:8px 0 0"><button type="button" class="oc-btn" data-acao="diag-copiar">Copiar diagnóstico</button> <button type="button" class="oc-link" data-acao="diag-baixar">baixar como arquivo</button></div>
-        ${diagMsg ? `<p class="oc-nota">${esc(diagMsg)}</p>` : ''}</div>
+        ${diagMsg && !diagMsg.startsWith('mk:') ? `<p class="oc-nota">${esc(diagMsg)}</p>` : ''}</div>
       <h4 class="oc-sub">Avisos</h4>
       <div class="oc-form">
       ${[['captura', 'Captura boa'], ['drop', 'Drop raro (token, fragmento, ticket)'], ['hunt', 'Hunt melhor liberada'], ['estoque', 'Estoque acabando'], ['equipe', 'Equipe inteira caiu'], ['auto', 'Automação parou'], ['boss', 'Boss derrotado']]
@@ -555,6 +557,62 @@
     }
     return parcial;
   }
+  // ---- Mercado da Comunidade: alvos de compra ---------------------------------------------
+  function abaMercado() {
+    const M = OC.mercado;
+    if (!M) return '<div class="oc-aviso">O módulo do Mercado não carregou. Recarregue a página.</div>';
+    const g = M.gasto(), md = M.medias(), alvos = prefs.mercadoAlvos ?? [];
+    const moedaR = (m) => (m === 'orb' ? 'Gemas' : 'Coins');
+    const filtrosTxt = (a) => {
+      const f = a.filtros ?? {};
+      return [f.potenciaMin && `P${f.potenciaMin}+`, f.ivMin && `IV ${f.ivMin}+`, f.qualidadeMin && `Q ${f.qualidadeMin}+`, f.notaMin && `N ${f.notaMin}+`, f.nivelMin && `nv ${f.nivelMin}+`, f.soShiny && 'shiny'].filter(Boolean).join(' · ');
+    };
+    const linhas = alvos.map((a, i) => {
+      const media = a.tipo === 'item' ? md[a.itemId]?.[a.moeda] : null;
+      const minimo = a.tipo === 'item' ? md[a.itemId]?.[a.moeda === 'orb' ? 'minOrb' : 'minGold'] : null;
+      return `<tr class="${a.ativo ? '' : 'oc-dim'}"><td><b>${esc(a.nome || 'qualquer espécie')}</b><small>${a.tipo === 'pokemon' ? `pokémon${filtrosTxt(a) ? ` · ${esc(filtrosTxt(a))}` : ''}` : 'item'}</small></td>
+        <td>${esc(M.preco(a.teto, a.moeda))}</td>
+        <td>${media ? esc(M.preco(Math.round(media), a.moeda)) : '—'}${minimo ? `<small>menor agora: ${esc(M.preco(minimo, a.moeda))}</small>` : ''}</td>
+        <td>${a.modo === 'comprar' ? '<b>compra sozinho</b>' : 'só avisa'}</td>
+        <td>${num(a.comprados || 0)}${Number(a.qtdMax) > 0 ? ` de ${num(a.qtdMax)}` : ''}</td>
+        <td><button type="button" class="oc-link" data-mk-pausa="${i}">${a.ativo ? 'pausar' : 'ativar'}</button> <button type="button" class="oc-link" data-mk-modo="${i}">${a.modo === 'comprar' ? 'só avisar' : 'comprar sozinho'}</button> <button type="button" class="oc-link" data-mk-del="${i}">remover</button></td></tr>`;
+    }).join('');
+    const nomesItens = [...new Set(Object.keys(md).map((id) => M.nomeItem(id)).filter((n) => !/^item #/.test(n)))].sort();
+    const nomesEsp = jogo ? [...jogo.especies.values()].map((e) => e.name).filter(Boolean).sort() : [];
+    const reg = M.registro().slice(0, 12).map((r) => `<li class="${r.tipo === 'erro' ? 'oc-neg' : r.tipo === 'ok' ? 'oc-pos' : ''}"><small>${new Date(r.t).toLocaleTimeString('pt-BR')}</small> ${esc(r.txt)}</li>`).join('');
+    return `<div class="oc-caixa"><b>Como funciona:</b> todo anúncio fica 2 minutos retido, e quem pede nos 3 primeiros segundos depois de ele liberar entra num sorteio com a mesma chance. A extensão olha cada alvo a cada ~20 s, avisa quando aparece algo dentro do seu preço e, no modo "comprar sozinho", manda <b>um</b> pedido dentro da janela do sorteio, com o preço que viu (se o vendedor subir, o jogo recusa). Enquanto o Mercado do jogo estiver aberto na sua tela, ela espera.</div>
+      <div class="oc-ctrl"><label><input type="checkbox" data-pref="mercadoLigado" ${prefs.mercadoLigado ? 'checked' : ''}> <b>Mercado ligado</b></label><span class="oc-nota">${esc(M.status())}${M.agendados() ? ` · ${M.agendados()} compra(s) agendada(s)` : ''}</span></div>
+      <div class="oc-tabela"><table><thead><tr><th>Alvo</th><th>Preço máximo</th><th>Média 7 dias</th><th>Modo</th><th>Comprados</th><th></th></tr></thead>
+      <tbody>${linhas || '<tr><td colspan="6">Nenhum alvo ainda: adicione um abaixo.</td></tr>'}</tbody></table></div>
+      <h4 class="oc-sub">Novo alvo</h4>
+      <div class="oc-form">
+        <label>Tipo<select data-mk="tipo"><option value="item">Item</option><option value="pokemon">Pokémon</option></select></label>
+        <label>Item ou espécie<input type="text" class="oc-txt" data-mk="nome" list="oc-mk-nomes" placeholder="Fire Stone, Bronze Boss Token, Charizard…"></label>
+        <datalist id="oc-mk-nomes">${[...nomesItens, ...nomesEsp].map((n) => `<option value="${esc(n)}"></option>`).join('')}</datalist>
+        <label>Preço máximo por unidade<input type="number" class="oc-num" min="1" data-mk="teto"></label>
+        <label>Moeda<select data-mk="moeda"><option value="gold">Coins</option><option value="orb">Gemas</option></select></label>
+        <label>Quantas comprar no total <small>(0 = sem limite)</small><input type="number" class="oc-num" min="0" value="1" data-mk="qtd"></label>
+        <label>Modo<select data-mk="modo"><option value="avisar">Só avisar</option><option value="comprar">Comprar sozinho</option></select></label>
+        <label>Pokémon: potência mínima<select data-mk="potenciaMin"><option value="">qualquer</option>${[2, 3, 4, 5].map((v) => `<option value="${v}">P${v}+</option>`).join('')}</select></label>
+        <label>Pokémon: IV somado mínimo<input type="number" class="oc-num" min="0" max="192" data-mk="ivMin"></label>
+        <label>Pokémon: qualidade mínima<input type="number" class="oc-num" min="0.8" max="1.8" step="0.01" data-mk="qualidadeMin"></label>
+        <label>Pokémon: nota mínima<input type="number" class="oc-num" min="0" max="10" step="0.1" data-mk="notaMin"></label>
+        <label>Pokémon: nível mínimo<input type="number" class="oc-num" min="1" data-mk="nivelMin"></label>
+        <label><input type="checkbox" data-mk="soShiny"> Pokémon: só shiny</label>
+      </div>
+      <div class="oc-ctrl"><button type="button" class="oc-btn" data-acao="mk-add">Adicionar alvo</button>
+        <button type="button" class="oc-link" data-acao="mk-medias">carregar itens e médias do Mercado</button>${diagMsg && diagMsg.startsWith('mk:') ? `<span class="oc-nota">${esc(diagMsg.slice(3))}</span>` : ''}</div>
+      <h4 class="oc-sub">Limites e travas</h4>
+      <div class="oc-form">
+        <label>Gastar no máximo por dia (Coins)<input type="number" class="oc-num" min="0" step="1000000" value="${Number(prefs.mercadoLimiteGold) || 0}" data-pref-num="mercadoLimiteGold"></label>
+        <label><input type="checkbox" data-pref="mercadoGemas" ${prefs.mercadoGemas ? 'checked' : ''}> Permitir comprar com Gemas</label>
+        <label>Gastar no máximo por dia (Gemas)<input type="number" class="oc-num" min="0" step="10" value="${Number(prefs.mercadoLimiteOrb) || 0}" data-pref-num="mercadoLimiteOrb"></label>
+        <label><input type="checkbox" data-pref="precoOutlandDoMercado" ${prefs.precoOutlandDoMercado !== false ? 'checked' : ''}> Usar a média do Mercado como preço do token e dos fragmentos na visão Outland</label>
+      </div>
+      <p class="oc-nota">Hoje: ${esc(M.preco(g.gold || 0, 'gold'))} de ${esc(M.preco(M.limite('gold'), 'gold'))}${prefs.mercadoGemas ? ` · ${esc(M.preco(g.orb || 0, 'orb'))} de ${esc(M.preco(M.limite('orb'), 'orb'))}` : ' · Gemas desligadas'}. O limite conta o pedido na hora em que ele sai, e devolve se a compra não acontecer.</p>
+      <h4 class="oc-sub">Registro</h4><ul class="oc-lista">${reg || '<li>Nada ainda.</li>'}</ul>`;
+  }
+
   function abaAlvo() {
     const ids = especiesEmHunt();
     const lista = jogo ? [...ids].map((id) => jogo.especies.get(id)).filter(Boolean).sort((a, b) => String(a.name).localeCompare(String(b.name))) : [];
@@ -649,6 +707,35 @@
         .then(async (ok) => { if (ok) { prefs.pkUpar = null; salvarPrefs(); } await recalcular(true); desenhar(); });
       desenhar();
     });
+    // ---- Mercado
+    painel.querySelector('[data-acao="mk-add"]')?.addEventListener('click', () => {
+      const v = (k) => painel.querySelector(`[data-mk="${k}"]`);
+      const tipo = v('tipo').value, nome = v('nome').value.trim(), teto = Number(v('teto').value), moeda = v('moeda').value;
+      const erro = (t) => { diagMsg = `mk:${t}`; desenhar(); };
+      if (!(teto > 0)) return erro('Diga o preço máximo por unidade.');
+      const a = { id: `a${Date.now().toString(36)}`, tipo, nome, teto, moeda, qtdMax: Math.max(0, Number(v('qtd').value) || 0), modo: v('modo').value, ativo: true, comprados: 0 };
+      if (tipo === 'item') {
+        a.itemId = OC.mercado.idDoItem(nome);
+        if (a.itemId == null) return erro(`Não conheço "${nome}". Use "carregar itens e médias do Mercado" e escolha um nome da lista.`);
+        a.nome = OC.mercado.nomeItem(a.itemId);
+      } else {
+        const esp = nome ? [...(jogo?.especies.values() ?? [])].find((e) => String(e.name).toLowerCase() === nome.toLowerCase() || String(e.pokeId) === nome.replace('#', '')) : null;
+        if (nome && !esp) return erro(`Não achei a espécie "${nome}".`);
+        a.especieId = esp?.pokeId ?? null; a.nome = esp?.name ?? '';
+        a.filtros = { potenciaMin: v('potenciaMin').value, ivMin: v('ivMin').value, qualidadeMin: v('qualidadeMin').value, notaMin: v('notaMin').value, nivelMin: v('nivelMin').value, soShiny: v('soShiny').checked };
+        if (!a.especieId && !Object.values(a.filtros).some(Boolean)) return erro('Para "qualquer espécie", escolha pelo menos um filtro.');
+      }
+      if (moeda === 'orb' && !prefs.mercadoGemas && a.modo === 'comprar') diagMsg = 'mk:Alvo salvo, mas a compra em Gemas está desligada nos limites abaixo.';
+      else diagMsg = 'mk:Alvo adicionado.';
+      (prefs.mercadoAlvos ??= []).push(a); salvarPrefs(); desenhar();
+    });
+    painel.querySelector('[data-acao="mk-medias"]')?.addEventListener('click', (ev) => {
+      ev.currentTarget.disabled = true; diagMsg = 'mk:carregando (alguns segundos)…'; desenhar();
+      OC.mercado.lerMedias().then(() => { diagMsg = 'mk:Itens e médias carregados.'; desenhar(); }).catch((e) => { diagMsg = `mk:${e.message}`; desenhar(); });
+    });
+    for (const b of painel.querySelectorAll('[data-mk-pausa]')) b.addEventListener('click', () => { const a = prefs.mercadoAlvos[Number(b.dataset.mkPausa)]; a.ativo = !a.ativo; salvarPrefs(); desenhar(); });
+    for (const b of painel.querySelectorAll('[data-mk-modo]')) b.addEventListener('click', () => { const a = prefs.mercadoAlvos[Number(b.dataset.mkModo)]; a.modo = a.modo === 'comprar' ? 'avisar' : 'comprar'; salvarPrefs(); desenhar(); });
+    for (const b of painel.querySelectorAll('[data-mk-del]')) b.addEventListener('click', () => { prefs.mercadoAlvos.splice(Number(b.dataset.mkDel), 1); salvarPrefs(); desenhar(); });
     for (const b of painel.querySelectorAll('[data-gravar]')) b.addEventListener('click', () => { if (OC.auto.gravando()) OC.auto.cancelarGravacao(); else OC.auto.gravarSaida(b.dataset.gravar); desenhar(); });
     painel.querySelector('[data-acao="preparar"]')?.addEventListener('click', () => { confirmando = selRow()?.slug ?? null; desenhar(); });
     painel.querySelector('[data-acao="preparar-nao"]')?.addEventListener('click', () => { confirmando = null; desenhar(); });
@@ -692,6 +779,7 @@
   setInterval(() => { if (painel && (prefs.aba === 'sessao' || prefs.aba === 'drops') && !painel.querySelector('input:focus, select:focus')) desenhar(); }, 3000);
   setInterval(() => { if (painel && prefs.aba === 'progresso' && !painel.querySelector('input:focus, select:focus')) desenhar(); }, 15000);
   OC.on('aviso', () => { if (painel && prefs.aba === 'ajustes' && !painel.querySelector('input:focus, select:focus, textarea:focus')) desenhar(); });
+  OC.on('mercado', () => { if (painel && prefs.aba === 'mercado' && !painel.querySelector('input:focus, select:focus')) desenhar(); });
   OC.on('auto', () => { if (painel && (prefs.aba === 'setup' || prefs.aba === 'ajustes' || prefs.aba === 'hunts') && !painel.querySelector('input:focus, select:focus')) desenhar(); });
   OC.ui = { abrir, fechar, desenhar, prefs, salvarPrefs, analiseFresca: async () => { await recalcular(false); return analise; },
     interno: () => ({ welcome, eu, jogo, itens, analise, xpDoTreinador: eu ? xpDoTreinador() : null, ritmo: eu ? ritmoTreinador() : null }) };
