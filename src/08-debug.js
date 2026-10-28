@@ -66,7 +66,7 @@
 
     return limpar({
       gerado_em: new Date().toISOString(),
-      extensao: '2.4.1',
+      extensao: '2.4.2',
       jogo_versao: jogo?.versao ?? null,
       navegador: navigator.userAgent,
       modulos: jogo?.mod ? Object.fromEntries(Object.entries(jogo.mod).map(([k, m]) => [k, Object.keys(m ?? {}).length ? Object.keys(m).slice(0, 12) : 'NÃO CARREGOU'])) : jogo,

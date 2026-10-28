@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.4.2 — 28/10/2026
+
+Ajustes para a segunda atualização da Wiki de 28/10/2026.
+
+- **Pódio de ginásio:** novo campo nos Ajustes para dizer em que lugar você está em cada ginásio. O dano do pokémon do tipo sobe +25% (líder), +10% (2º) ou +5% (3º) na hunt, nos golpes e na Investida, valendo o melhor lugar entre os tipos dele, sem empilhar.
+- **Ritmo das hunts:** os selvagens passaram a nascer em bandos calibrados em todas as áreas, de Kanto a Paldea e na Outland. As medições de abates por hora feitas antes de 28/10 deixam de valer, e a extensão volta a usar o modelo até medir de novo (15 min na hunt).
+- **Troca de pokémon em campo:** respeita a nova espera de 3 s entre uma troca e a seguinte.
+- Alvo padrão do Boost dos Atrasados: nv 943 (só vale quando o jogo não informa).
+
 ## 2.4.1 — 27/10/2026
 
 ### Corrigido

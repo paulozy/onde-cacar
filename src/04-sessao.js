@@ -177,8 +177,11 @@
     zerar: () => { const a = banco.atual; comecar(a?.slug ?? null, a?.nome); },
     ativa: () => banco.atual?.slug ?? null,
     calibracao: () => {
+      // Em 28/10/2026 os selvagens passaram a nascer em bandos calibrados em todas as áreas, de
+      // Kanto a Paldea e na Outland: o que foi medido antes disso não descreve mais o ritmo.
+      const CORTE_RITMO = Date.UTC(2026, 9, 28, 3, 0, 0);
       const agora = Date.now(), out = {};
-      for (const [k, v] of Object.entries(banco.calib ?? {})) if (agora - v.t < VALIDADE_CALIB) out[k] = v;
+      for (const [k, v] of Object.entries(banco.calib ?? {})) if (agora - v.t < VALIDADE_CALIB && v.t >= CORTE_RITMO) out[k] = v;
       return out;
     },
     esquecerCalibracao: () => { banco.calib = {}; salvar(); },

@@ -12,7 +12,7 @@
     pocao: 'auto', bola: 'auto', vender: true, bike: 0, precoBeast: 100, hpMinimo: 0.35, horas: 4, sel: null,
     autoRepor: false, autoTrocar: false, autoMinHoras: 1, autoReserva: 1000000, autoTetoHora: 3000000,
     mercadoLigado: false, mercadoLimiteGold: 50000000, mercadoGemas: false, mercadoLimiteOrb: 0, precoOutlandDoMercado: true,
-    precoDiamante: 7, alvoAtrasados: 941, contarLive: false, avisoSom: false, avisoPotMin: 3, avisoQualMin: 1.5, avisoIvMin: 150,
+    precoDiamante: 7, alvoAtrasados: 943, ginasios: [], contarLive: false, avisoSom: false, avisoPotMin: 3, avisoQualMin: 1.5, avisoIvMin: 150,
     ...lerJ(CHAVE_PREFS, {}),
   };
   if (prefs.aba === 'comprar') prefs.aba = 'alvo'; // a aba Comprar saiu na 2.1
@@ -54,7 +54,7 @@
   async function recalcular(forcar = false) {
     const pk = pkAnalise();
     if (!welcome || !eu || !pk) { analise = null; return; }
-    const sig = assinar(pk) + JSON.stringify([prefs.ordem, prefs.pocao, prefs.bola, prefs.vender, prefs.bike, prefs.hpMinimo, prefs.precoBeast, prefs.tipoDiaManual, prefs.tipoDiaManualAte, OC.proximaViradaSazonal?.(), OC.tipoDoDia?.({ welcome, eu }), prefs.precoToken, prefs.precoFragChave, prefs.precoFragShiny, prefs.precoFragBike]);
+    const sig = assinar(pk) + JSON.stringify([prefs.ordem, prefs.pocao, prefs.bola, prefs.vender, prefs.bike, prefs.hpMinimo, prefs.precoBeast, prefs.tipoDiaManual, prefs.tipoDiaManualAte, OC.proximaViradaSazonal?.(), OC.tipoDoDia?.({ welcome, eu }), prefs.precoToken, prefs.precoFragChave, prefs.precoFragShiny, prefs.precoFragBike, JSON.stringify(prefs.ginasios ?? [])]);
     if (!forcar && analise && sig === assinatura) return;
     try {
       jogo ??= await OC.carregarJogo();
@@ -392,6 +392,8 @@
       <label class="oc-chk"><input type="checkbox" data-pref="vender" ${prefs.vender ? 'checked' : ''}> Vendo as capturas no NPC</label>
       <label>Quanto custa uma Beast Ball para você (ouro)<input type="number" min="0" step="100" value="${Number(prefs.precoBeast) || 0}" data-pref-num="precoBeast" class="oc-num"></label>
       <label>Bicicleta<select data-pref-sel="bike">${[[0, 'Sem bicicleta'], [0.15, 'Comum (+15%)'], [0.25, 'Incomum (+25%)'], [0.5, 'Rara (+50%)'], [0.75, 'Mítica (+75%)'], [1, 'Lendária (+100%)']].map(([v, r]) => opt(v, r, prefs.bike)).join('')}</select></label>
+      <label>Pódio de ginásio <small>· +25% líder, +10% 2º, +5% 3º no dano do pokémon do tipo, na hunt e no boss</small>
+        <span class="oc-ginasios">${OC.TIPOS18.map((t) => { const g = (prefs.ginasios ?? []).find((x) => x.tipo === t); return `<select data-ginasio="${t}" title="${t}"><option value="">${t}: —</option>${[1, 2, 3].map((p) => `<option value="${p}" ${g?.pos === p ? 'selected' : ''}>${t}: ${p === 1 ? 'líder' : `${p}º`}</option>`).join('')}</select>`; }).join('')}</span></label>
       <label>Tipagem do dia (troca às 18:00)${prefs.tipoDiaManual && prefs.tipoDiaManual !== 'auto' && prefs.tipoDiaManualAte ? ` <small>· sua escolha vale até ${new Date(prefs.tipoDiaManualAte).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</small>` : ''}<select data-pref-sel="tipoDiaManual">${opt('auto', OC.tipoDoDia?.({ welcome, eu }) ? `Do jogo: ${TIPO[OC.tipoDoDia({ welcome, eu })]}` : 'Do jogo (se ele informar)', prefs.tipoDiaManual ?? 'auto')}${opt('nenhum', 'Ignorar', prefs.tipoDiaManual)}${Object.entries(TIPO).map(([k, r]) => opt(k, r, prefs.tipoDiaManual)).join('')}</select></label>
       <label>Nunca deixar o HP cair abaixo de<select data-pref-sel="hpMinimo">${[[0.25, '25%'], [0.35, '35%'], [0.5, '50%'], [0.65, '65%']].map(([v, r]) => opt(v, r, prefs.hpMinimo)).join('')}</select></label>
       </div>
@@ -744,6 +746,12 @@
     for (const b of painel.querySelectorAll('[data-mk-modo]')) b.addEventListener('click', () => { const a = prefs.mercadoAlvos[Number(b.dataset.mkModo)]; a.modo = a.modo === 'comprar' ? 'avisar' : 'comprar'; salvarPrefs(); desenhar(); });
     for (const b of painel.querySelectorAll('[data-mk-del]')) b.addEventListener('click', () => { prefs.mercadoAlvos.splice(Number(b.dataset.mkDel), 1); salvarPrefs(); desenhar(); });
     for (const b of painel.querySelectorAll('[data-gravar]')) b.addEventListener('click', () => { if (OC.auto.gravando()) OC.auto.cancelarGravacao(); else OC.auto.gravarSaida(b.dataset.gravar); desenhar(); });
+    for (const sel of painel.querySelectorAll('[data-ginasio]')) sel.addEventListener('change', async () => {
+      const t = sel.dataset.ginasio, pos = Number(sel.value) || 0;
+      prefs.ginasios = (prefs.ginasios ?? []).filter((g) => g.tipo !== t);
+      if (pos) prefs.ginasios.push({ tipo: t, pos });
+      salvarPrefs(); await recalcular(true); desenhar();
+    });
     painel.querySelector('[data-bola-jogo]')?.addEventListener('click', async (ev) => { prefs.bola = ev.currentTarget.dataset.bolaJogo; salvarPrefs(); await recalcular(true); desenhar(); });
     painel.querySelector('[data-acao="preparar"]')?.addEventListener('click', () => { confirmando = selRow()?.slug ?? null; desenhar(); });
     painel.querySelector('[data-acao="preparar-nao"]')?.addEventListener('click', () => { confirmando = null; desenhar(); });

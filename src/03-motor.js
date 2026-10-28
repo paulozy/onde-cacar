@@ -340,12 +340,15 @@
     const mortoS = M.msOnda / n + M.retarget;
     let ttk = 0, dps = 0, hitMax = 0, hitMedio = 0, xpK = 0, ouroK = 0, lootK = 0, efm = 0, umGolpe = 0;
     let melhor = null, melhorD = -1;
+    // Wiki (28/10/2026): o pódio do ginásio do tipo bate mais forte na hunt e no boss, com o
+    // pokémon inteiro (golpes e Investida): +25% o líder, +10% o 2º, +5% o 3º; não empilha
+    const fGinasio = (op.ginasios ?? []).filter((g) => P.tipos.includes(g.tipo)).reduce((m, g) => Math.max(m, 1 + (({ 1: 0.25, 2: 0.10, 3: 0.05 })[g.pos] || 0)), 1);
     const loot = new Map();
     const cap = BOLAS.map(() => ({ ch: 0, venda: 0 }));
     for (const { esp, pontos } of lista) {
       const w = pontos / total;
       const tA = tiposDe(esp);
-      const fd = fDia(op.tipoDia, P.tipos, tA);
+      const fd = fDia(op.tipoDia, P.tipos, tA) * fGinasio;
       const golpes = P.golpes.map((g) => {
         const fis = g.category !== 'SPECIAL';
         const e = ef(g.type, tA[0], tA[1]);
@@ -458,6 +461,7 @@
    *  para o mais velho: a mensagem do jogo sobre o dia, o estado, o welcome e, por último, o ícone do
    *  dia na tela da hunt (pelo nome do dia). */
   const TIPOS18 = new Set(Object.keys(PEDRA));
+  OC.TIPOS18 = Object.keys(PEDRA);
   const NOMES_DIA = [['Céu Limpo', 'NORMAL'], ['Escaldante', 'FIRE'], ['Chuvoso', 'WATER'], ['Florido', 'GRASS'], ['de Tempestade', 'ELECTRIC'],
     ['de Nevasca', 'ICE'], ['de Treino', 'FIGHTING'], ['Tóxico', 'POISON'], ['de Terremoto', 'GROUND'], ['de Ventania', 'FLYING'], ['Telepático', 'PSYCHIC'],
     ['do Enxame', 'BUG'], ['de Avalanche', 'ROCK'], ['Assombrado', 'GHOST'], ['do Dragão', 'DRAGON'], ['Noite Eterna', 'DARK'], ['da Forja', 'STEEL'], ['Encantado', 'FAIRY']];

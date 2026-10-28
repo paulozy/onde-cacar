@@ -100,3 +100,6 @@ tr.oc-dim td { opacity: .5; }
 
 .oc-txt { width: 100%; background: #462b39; color: #fff6ef; border: 1px solid #480e1e; border-radius: 5px; padding: 6px; font: 500 12px/1.4 ui-monospace, Consolas, monospace; resize: vertical; }
 .oc-caixa.oc-neg { color: #ffb3b3; }
+
+.oc-painel .oc-ginasios { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.oc-painel .oc-ginasios select { width: auto; min-width: 0; font-size: 11px; padding: 2px 4px; }

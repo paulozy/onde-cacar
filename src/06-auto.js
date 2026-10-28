@@ -129,6 +129,8 @@
   });
 
   // ---- trocar o pokémon em campo -------------------------------------------------------------
+  let trocaPkEm = 0, ativoVisto = null;
+  OC.on('estado', (e) => { if (e?.activeId != null && e.activeId !== ativoVisto) { if (ativoVisto != null) trocaPkEm = Date.now(); ativoVisto = e.activeId; } });
   // Grava a mensagem que o jogo manda quando você põe um pokémon em campo e descobre qual campo
   // dela é o id: o que bate com o novo activeId logo depois.
   function acharCaminho(o, alvo, prof = 0) {
@@ -153,6 +155,9 @@
   }
   async function colocarEmCampo(id) {
     if (eu?.activeId === id) return true;
+    // Wiki (28/10/2026): entre uma troca de pokémon e a seguinte há 3 s de espera
+    const esperaTroca = trocaPkEm + 3300 - Date.now();
+    if (esperaTroca > 0) await dormir(esperaTroca);
     const a = prefs().ativar;
     if (!a?.raw || !a.caminho) { registrar('ensine a troca de pokémon primeiro (aba Hunts)', 'erro'); return false; }
     const m = JSON.parse(a.raw);
