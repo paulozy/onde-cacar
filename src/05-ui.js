@@ -315,7 +315,13 @@
       return `<tr><td>${esc(i.nome)}</td><td>${num(i.precisa)}</td><td>${i.tem == null ? '?' : num(i.tem)}</td><td class="${i.falta ? 'oc-neg' : 'oc-pos'}">${falta}</td></tr>`;
     }).join('');
     const aqui = eu?.huntSlug === r.slug && !eu?.noCentro;
-    const autoTxt = OC.auto ? `<div class="oc-auto">
+    const bj = OC.bolaDoJogo?.(), bolaJogo = bj ? OC.BOLAS.find((b) => b.id === bj.id) : null;
+    const avisoBola = bolaJogo && r.bola && bolaJogo.id !== r.bola.id && prefs.bola !== 'nenhuma'
+      ? `<div class="oc-aviso">O jogo está arremessando <b>${esc(bolaJogo.nome)}</b> (${num(bj.n)} nos últimos 15 min), mas a extensão está calculando${r.bola.premium ? ' e repondo' : ''} com <b>${esc(r.bola.nome)}</b>${r.bola.premium ? `, que não se compra com ouro: a ${esc(bolaJogo.nome)} nunca é reposta` : ''}. A ordem das bolas é escolhida no próprio jogo, na automação de lançar. <button type="button" class="oc-btn" data-bola-jogo="${esc(bolaJogo.chave)}">Usar ${esc(bolaJogo.nome)} na extensão</button></div>` : '';
+    const reserva = Number(prefs.autoReserva) || 0, livre = (Number(eu?.gold) || 0) - reserva;
+    const avisoReserva = custo > 0 && reserva > 0 && custo > livre
+      ? `<div class="oc-aviso">A reserva de ouro (${curto(reserva)}, em Ajustes) deixa só ${curto(Math.max(0, livre))} livres para compras, e este setup custa ${curto(custo)}. A compra para antes: baixe a reserva ou espere juntar.</div>` : '';
+    const autoTxt = OC.auto ? `${avisoBola}${avisoReserva}<div class="oc-auto">
         ${confirmando === r.slug
           ? `<p>Vou comprar ${lista.filter((i) => i.falta > 0 && !i.premium).map((i) => `${num(i.falta)} ${esc(i.nome)}`).join(' e ') || 'nada'} (${curto(custo)} de ouro; você tem ${curto(Number(eu?.gold) || 0)})${simulandoOutro() ? `, colocar ${esc(pkAnalise().nome)} em campo` : ''}${aqui && !simulandoOutro() ? '' : ` e levar você para ${esc(r.nome)} assim que a troca de área liberar`}.${simulandoOutro() && !prefs.ativar?.caminho ? ' <b class="oc-neg">Antes, ensine a troca de pokémon na aba Hunts.</b>' : ''}${(Number(eu?.gold) || 0) - custo < (Number(prefs.autoReserva) || 0) ? ` <b class="oc-neg">Isso deixaria o ouro abaixo da reserva de ${curto(Number(prefs.autoReserva) || 0)} (Ajustes): a compra vai parar antes.</b>` : ''}</p>
              <button type="button" class="oc-btn" data-acao="preparar-ok">Confirmar</button> <button type="button" class="oc-link" data-acao="preparar-nao">cancelar</button>`
@@ -738,6 +744,7 @@
     for (const b of painel.querySelectorAll('[data-mk-modo]')) b.addEventListener('click', () => { const a = prefs.mercadoAlvos[Number(b.dataset.mkModo)]; a.modo = a.modo === 'comprar' ? 'avisar' : 'comprar'; salvarPrefs(); desenhar(); });
     for (const b of painel.querySelectorAll('[data-mk-del]')) b.addEventListener('click', () => { prefs.mercadoAlvos.splice(Number(b.dataset.mkDel), 1); salvarPrefs(); desenhar(); });
     for (const b of painel.querySelectorAll('[data-gravar]')) b.addEventListener('click', () => { if (OC.auto.gravando()) OC.auto.cancelarGravacao(); else OC.auto.gravarSaida(b.dataset.gravar); desenhar(); });
+    painel.querySelector('[data-bola-jogo]')?.addEventListener('click', async (ev) => { prefs.bola = ev.currentTarget.dataset.bolaJogo; salvarPrefs(); await recalcular(true); desenhar(); });
     painel.querySelector('[data-acao="preparar"]')?.addEventListener('click', () => { confirmando = selRow()?.slug ?? null; desenhar(); });
     painel.querySelector('[data-acao="preparar-nao"]')?.addEventListener('click', () => { confirmando = null; desenhar(); });
     painel.querySelector('[data-acao="preparar-ok"]')?.addEventListener('click', () => {

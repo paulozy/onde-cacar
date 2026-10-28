@@ -36,6 +36,29 @@
     return out;
   }
   OC.inventario = inventario;
+  // A bola que o lançamento automático do jogo está usando: a que mais caiu nos últimos 15 min.
+  // (A ordem das bolas é escolhida no próprio jogo; a extensão só percebe pelo estoque.)
+  const consumoBolas = [];
+  let bolasAntes = null;
+  OC.on('estado', (e) => {
+    const b = e?.balls;
+    if (!b || typeof b !== 'object' || Array.isArray(b)) return;
+    if (bolasAntes) for (const [id, n] of Object.entries(b)) {
+      const d = (Number(bolasAntes[id]) || 0) - (Number(n) || 0);
+      if (d > 0 && d < 50) consumoBolas.push({ t: Date.now(), id: Number(id), n: d });
+    }
+    bolasAntes = { ...b };
+    const lim = Date.now() - 15 * 60000;
+    while (consumoBolas.length && consumoBolas[0].t < lim) consumoBolas.shift();
+  });
+  OC.bolaDoJogo = () => {
+    const por = {};
+    for (const c of consumoBolas) por[c.id] = (por[c.id] || 0) + c.n;
+    let melhor = null;
+    for (const [id, n] of Object.entries(por)) if (n >= 5 && (!melhor || n > melhor.n)) melhor = { id: Number(id), n };
+    return melhor;
+  };
+
   OC.estoque = (e, tipo, id) => {
     const fonte = tipo === 'bola' ? e?.balls : e?.items;
     if (!fonte) return null;

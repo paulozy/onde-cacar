@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.4.1 — 27/10/2026
+
+### Corrigido
+- **Bola diferente da que o jogo usa:** a extensão percebe pela queda do estoque qual bola o lançamento automático do jogo está arremessando. Se for outra que a dos Ajustes, o Setup avisa e oferece trocar com um clique. Antes, com Beast Ball escolhida e o jogo gastando Ultra, a Ultra nunca era reposta e as capturas por hora apareciam dobradas.
+- **Compra parada pela reserva de ouro:** o Setup avisa antes do clique quando a reserva dos Ajustes não deixa ouro livre para o setup, e a automação manda uma notificação quando para por causa dela.
+- **Relógio do servidor medido também pelo estado do jogo**, não só pelo mapa da hunt: vale mesmo fora da hunt e corrige PCs com o relógio adiantado ou atrasado.
+- O diagnóstico traz o registro da automação e a bola que o jogo está usando.
+
 ## 2.4.0 — 27/10/2026
 
 ### Novo

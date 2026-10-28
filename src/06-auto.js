@@ -76,7 +76,11 @@
       const lote = Math.min(resto, MAX_POR_COMPRA);
       const custo = lote * preco;
       const reserva = Number(p.autoReserva) || 0;
-      if ((Number(eu?.gold) || 0) - custo < reserva) { registrar(`parei: comprar ${lote} ${nome} deixaria o ouro abaixo da reserva`, 'erro'); return false; }
+      if ((Number(eu?.gold) || 0) - custo < reserva) {
+        registrar(`parei: comprar ${lote} ${nome} deixaria o ouro abaixo da reserva de ${reserva.toLocaleString('pt-BR')}`, 'erro');
+        OC.avisos?.avisar?.('reserva', 'Compra parada pela reserva', `Comprar ${lote} ${nome} deixaria o ouro abaixo da reserva (${reserva.toLocaleString('pt-BR')}, em Ajustes).`, 3600000);
+        return false;
+      }
       if (p.autoTetoHora > 0 && gastoHora() + custo > p.autoTetoHora) { registrar(`parei: passaria do gasto máximo por hora`, 'erro'); return false; }
       const espera = ultimaAcao + ESPACO_MS - Date.now();
       if (espera > 0) await dormir(espera);

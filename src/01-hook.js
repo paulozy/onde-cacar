@@ -92,6 +92,9 @@
       OC.emit('welcome', m);
       if (m.estado) entregar({ ...m.estado, cheio: true });
     } else if (tipo === 'estado') {
+      // o estado traz a hora do servidor: mede o relógio mesmo fora da hunt
+      const sa = Number(m.estado?.servidorAgora);
+      if (sa > 1e12) { relogio.push(sa - Date.now()); if (relogio.length > 40) relogio.shift(); OC.offsetServidor = Math.max(...relogio); }
       if (m.estado) entregar(m.estado);
     } else if (tipo === 'batalha') {
       for (const e of Array.isArray(m.ev) ? m.ev : []) OC.emit('batalha.ev', e);
