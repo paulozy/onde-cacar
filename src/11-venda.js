@@ -6,8 +6,8 @@
   const OC = root.__ondeCacar;
   if (!OC) return;
 
-  // Wiki: comissão de 10% em Coins e 15% em Gemas; 1.000 Gemas sacam US$ 10
-  const COMISSAO = { gold: 0.10, orb: 0.15 };
+  // comissão de 15% em Coins (a mesma do ranking da Outland, 03-motor.js) e 15% em Gemas; 1.000 Gemas sacam US$ 10
+  const COMISSAO = { gold: 0.15, orb: 0.15 };
   const USD_POR_GEMA = 0.01;
   const NOTA_MIN = 3.5, NIVEL_MIN = 50;
   const bool = (x) => x === true || x === 1 || x === 'true';
