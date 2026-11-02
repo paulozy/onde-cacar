@@ -1,5 +1,32 @@
 # Changelog
 
+## 2.6.0 — 02/11/2026
+
+### Mercado: alvos de compra refeitos
+- **Alvo livre:** dá para criar "qualquer pokémon até 20 mi" sem preencher filtro nenhum. A nota mínima é opcional: o próprio Mercado já exige 3,5 (menos shiny, P5 e lendário).
+- **Editar alvo:** o alvo volta para o formulário, mantém o que já comprou (ou zera, se você marcar) e é olhado de novo na hora. Um alvo que tinha parado por ter comprado tudo volta a valer quando ganha mais quantidade.
+- **Duplicar alvo**, para criar variações sem preencher tudo de novo, e **remover com confirmação**.
+- **Campos de preço com pontos de milhar** enquanto você digita (20.000.000), com a dica por extenso embaixo ("20 milhões") para conferir as casas. Aceita atalhos: 20m, 1,5b, 500k, 20kk. Vale também para os limites diários, a reserva de ouro, os preços dos Ajustes e o preço da aba Preço.
+- **O formulário não perde mais o que você digitou** quando o painel se atualiza no meio do preenchimento.
+- **Resumo antes de salvar**, em uma frase ("Comprar Charizard (sem shiny · nv 100+) por 15.000.000 Coins, até 1 pokémon"), com avisos: shiny em Coins (o jogo só vende shiny em Gemas), compra em Gemas desligada, sem limite de quantidade, qualquer espécie no modo comprar.
+- **Filtros novos:** nível máximo, shiny "tanto faz / só shiny / sem shiny", só com TM AoE e sem variantes de Outland.
+- **Preço relativo:** comprar ou avisar quando o anúncio estiver pelo menos X% abaixo do preço justo da aba Preço (precisa de espécie; recusa quando a conta tem confiança fraca). Pode ser usado junto com o preço máximo.
+- O formulário mostra só os campos do tipo escolhido (Pokémon ou Item), confirma a espécie reconhecida e, para itens, a média de 7 dias e o menor anúncio na moeda escolhida.
+
+### Corrigido
+- Uma compra agendada confere o alvo de novo na hora de sair: se você baixou o preço ou mudou um filtro depois, o anúncio que não serve mais não é comprado.
+
+## 2.5.0 — 02/11/2026
+
+### Novo
+- **Aba Preço (price check do Mercado):** abra uma espécie na aba Pokemon do Mercado do jogo e a extensão compara cada anúncio com as vendas reais dos últimos 30 dias, lidas da Tabela de preços do jogo. Para cada um: o preço justo, a faixa normal (do 25º ao 75º percentil), quanto ele está acima ou abaixo, e um veredito (barato, justo, caro, muito caro), do melhor negócio para o pior.
+- **Como a conta compara:** só vendas da mesma espécie, na mesma moeda e com o mesmo brilho (P5 só com P5). Cada venda é ajustada para a nota do anúncio por uma curva preço × nota medida nas vendas da própria espécie. As mais recentes e mais parecidas em potência, nível, TM AoE, TM elemental e refino pesam mais, e o preço justo é a mediana, para uma venda absurda não arrastar a conta. Com poucas vendas parecidas, a confiança aparece como média ou fraca.
+- **Igual ou melhor por menos:** avisa quando a mesma vitrine tem um anúncio igual ou melhor em tudo (potência, nota, nível, TM e refino) por um preço menor.
+- **Ver vendas:** cada anúncio abre as vendas parecidas que entraram na conta, com o preço de cada uma e o preço puxado para a nota do anúncio.
+- **Comparar com o meu:** quanto XP/h o pokémon anunciado faria no nível do seu pokémon em campo, nas mesmas hunts, e quanto custa cada +1% de XP/h.
+- **Avaliar um pokémon específico:** espécie, nível, potência, nota, shiny, TM, refino, moeda e preço, sem precisar do anúncio aberto.
+- As vendas lidas ficam guardadas neste navegador (até 4.000, dos últimos 30 dias), e a Tabela de preços aberta no próprio jogo também alimenta a conta. Os pedidos usam a mesma fila do sniper, um a cada 3 s, e a mesma espécie não é pedida de novo antes de 10 minutos.
+
 ## 2.4.2 — 28/10/2026
 
 Ajustes para a segunda atualização da Wiki de 28/10/2026.

@@ -73,6 +73,7 @@
   // um pedido por vez: a resposta do Mercado não traz o número do pedido, então a fila garante
   // que a próxima resposta é a deste pedido
   let fila = Promise.resolve();
+  let listouEm = 0; // quando o sniper pediu uma vitrine (para o price check não confundir com a sua)
   function pedir(msg, bate) {
     const p = fila.then(() => pedirAgora(msg, bate));
     fila = p.catch(() => {});
@@ -123,13 +124,17 @@
   const alvos = () => (prefs().mercadoAlvos ??= []);
   const faltam = (a) => (Number(a.qtdMax) > 0 ? Math.max(0, a.qtdMax - (a.comprados || 0)) : Infinity);
 
+  /** Shiny do alvo: 'qualquer' | 'so' | 'nao' (alvos antigos guardavam soShiny: true). */
+  const shinyDe = (f) => f.shiny ?? (f.soShiny ? 'so' : 'qualquer');
+  const OUTLAND = (sp) => sp >= 2001 && sp < 3000;
   function filtrosPokemon(a) {
     const f = a.filtros ?? {};
     const s = (v) => (v == null || v === '' ? '' : String(v));
     return {
       t: 'market.listar', tipo: 'pokemon', moeda: a.moeda, busca: '', ordem: 'baratos', criterios: [], elementos: [], categoria: '',
-      soShiny: !!f.soShiny, soP5: false, soMega: false, soLendario: false, soTmElemental: false, soTmAoe: false, semOutland: false,
-      nivelMin: s(f.nivelMin), nivelMax: '', potenciaMin: s(f.potenciaMin), potenciaMax: '', ivMin: s(f.ivMin), ivMax: '',
+      soShiny: shinyDe(f) === 'so', soP5: false, soMega: false, soLendario: false, soTmElemental: false, soTmAoe: !!f.soTmAoe, semOutland: !!f.semOutland,
+      nivelMin: s(f.nivelMin), nivelMax: s(f.nivelMax), potenciaMin: s(f.potenciaMin), potenciaMax: '', ivMin: s(f.ivMin), ivMax: '',
+      // nota vazia = qualquer: o Mercado já exige 3,5 (menos shiny, P5 e lendário, que entram com qualquer nota)
       qualidadeMin: s(f.qualidadeMin), qualidadeMax: '', notaMin: s(f.notaMin), notaMax: '', pagina: 0,
       ...(a.especieId ? { especieId: Number(a.especieId) } : {}),
     };
@@ -138,14 +143,35 @@
   function pokemonServe(a, fi) {
     const f = a.filtros ?? {};
     if (!fi) return false;
-    if (a.especieId && Number(fi.speciesId) !== Number(a.especieId)) return false;
-    if (f.soShiny && !fi.shiny) return false;
+    const sp = Number(fi.speciesId), sh = shinyDe(f);
+    if (a.especieId && sp !== Number(a.especieId)) return false;
+    if (sh === 'so' && !fi.shiny) return false;
+    if (sh === 'nao' && fi.shiny) return false;
+    if (f.soTmAoe && !(fi.tmAoe === true || fi.tmAoe === 1)) return false;
+    if (f.semOutland && OUTLAND(sp)) return false;
     if (f.potenciaMin && (Number(fi.potencia) || 0) < Number(f.potenciaMin)) return false;
     if (f.ivMin && (Number(fi.ivTotal) || 0) < Number(f.ivMin)) return false;
     if (f.qualidadeMin && (Number(fi.quality) || 0) < Number(f.qualidadeMin)) return false;
     if (f.notaMin && (Number(fi.nota) || 0) < Number(f.notaMin)) return false;
     if (f.nivelMin && (Number(fi.level) || 0) < Number(f.nivelMin)) return false;
+    if (f.nivelMax && (Number(fi.level) || 0) > Number(f.nivelMax)) return false;
     return true;
+  }
+  /** Teto do alvo: o preço fixo, se houver (sem preço fixo, só o relativo ao preço justo decide). */
+  const tetoDe = (a) => (Number(a.teto) > 0 ? Number(a.teto) : Infinity);
+  /**
+   * Teto relativo: o anúncio precisa estar pelo menos X% abaixo do preço justo da aba Preço.
+   * Lê as vendas da espécie (no máximo 1 vez a cada 10 min) e recusa quando a conta é fraca.
+   */
+  async function abaixoDoJusto(a, l) {
+    if (!(Number(a.relPct) > 0)) return { ok: true };
+    if (!OC.preco || !a.especieId) return { ok: false };
+    const r = OC.preco.resumir(l.ficha);
+    try { await OC.preco.ler(r.sp, r.nome || a.nome, r.sh); } catch { return { ok: false }; }
+    const res = OC.preco.avaliar({ ...r, moeda: l.moeda, preco: Number(l.preco) });
+    if (!res?.estimado || res.confianca === 'fraca') return { ok: false };
+    const lim = res.estimado * (1 - Number(a.relPct) / 100);
+    return { ok: Number(l.preco) <= lim, justo: res.estimado };
   }
   const meu = (l) => { const n = String(eu()?.nick ?? '').toLowerCase(); return !!n && String(l.vendedor ?? '').toLowerCase() === n; };
 
@@ -157,17 +183,20 @@
   async function checar(a) {
     let r;
     if (a.tipo === 'item') r = await pedir({ t: 'market.item', itemId: Number(a.itemId), moeda: a.moeda }, (m) => m.aba === 'item' && Number(m.itemId) === Number(a.itemId) && m.moeda === a.moeda);
-    else r = await pedir(filtrosPokemon(a), (m) => m.aba === 'vitrine');
+    else { listouEm = Date.now(); r = await pedir(filtrosPokemon(a), (m) => m.aba === 'vitrine'); listouEm = Date.now(); }
     const agora = agoraSrv();
     for (const l of r.linhas ?? []) {
-      if (!l || l.estado !== 'aberto' || l.moeda !== a.moeda || !(Number(l.preco) <= Number(a.teto))) continue;
+      if (!l || l.estado !== 'aberto' || l.moeda !== a.moeda || !(Number(l.preco) <= tetoDe(a))) continue;
       if (a.tipo === 'pokemon' && !pokemonServe(a, l.ficha)) continue;
       if (meu(l) || vistos.has(l.id)) continue;
+      const rel = a.tipo === 'pokemon' ? await abaixoDoJusto(a, l) : { ok: true };
+      if (!rel.ok) continue;
       vistos.set(l.id, { alvo: a.id, quando: Date.now() });
       const libera = Number(l.compravelEm) || 0;
       const em = libera > agora ? `libera em ${Math.ceil((libera - agora) / 1000)} s` : 'já liberado';
-      registrar(`achei ${descrever(l, a)} (${em})`);
-      OC.avisos?.avisar?.(`mercado-${l.id}`, 'Mercado: oportunidade', `${descrever(l, a)}, teto ${OC.mercado.preco(a.teto, a.moeda)} · ${em}`);
+      const justo = rel.justo ? `, ${Math.round((1 - Number(l.preco) / rel.justo) * 100)}% abaixo do preço justo (${OC.mercado.preco(Math.round(rel.justo), a.moeda)})` : '';
+      registrar(`achei ${descrever(l, a)}${justo} (${em})`);
+      OC.avisos?.avisar?.(`mercado-${l.id}`, 'Mercado: oportunidade', `${descrever(l, a)}${justo}${Number(a.teto) > 0 ? `, teto ${OC.mercado.preco(a.teto, a.moeda)}` : ''} · ${em}`);
       if (a.modo === 'comprar') agendar(l, a);
     }
   }
@@ -199,6 +228,10 @@
     const alvo = alvos().find((x) => x.id === a.id);
     if (!p.mercadoLigado || !alvo?.ativo || alvo.modo !== 'comprar' || enviados.has(l.id)) return;
     if (l.moeda === 'orb' && !p.mercadoGemas) return registrar('compra em Gemas desligada nos ajustes do Mercado', 'erro');
+    // o alvo pode ter sido editado depois que o anúncio foi agendado: confere de novo com o alvo atual
+    if (Number(l.preco) > tetoDe(alvo) || l.moeda !== alvo.moeda || (l.tipo === 'pokemon' && !pokemonServe(alvo, l.ficha))) {
+      return registrar(`não comprei ${descrever(l, a)}: o alvo "${alvo.nome || 'qualquer pokémon'}" mudou e ele não serve mais`);
+    }
     const preco = Number(l.preco);
     let qtd = l.tipo === 'pokemon' ? 1 : Math.min(Number(l.qtd) || 1, faltam(alvo));
     qtd = Math.min(qtd, Math.floor(sobra(l.moeda) / preco));
@@ -317,6 +350,9 @@
     posCompra: () => posCompra,
     categorias: CATEGORIAS,
     lerMedias: () => lerMedias(true),
+    pedir, naTela: mercadoNaTela, shinyDe,
+    /** Depois de editar um alvo: os anúncios que ele já tinha descartado voltam a ser olhados. */
+    reolhar: (alvoId) => { for (const [id, v] of vistos) if (v.alvo === alvoId && !agendados.has(id)) vistos.delete(id); olhadoEm.delete(alvoId); }, listouAgora: () => Date.now() - listouEm < 8000,
     preco: (v, moeda) => (moeda === 'orb' ? `${Number(v).toLocaleString('pt-BR')} Gemas` : `${Number(v).toLocaleString('pt-BR')} Coins`),
     cancelarAgendados: () => { for (const x of agendados.values()) clearTimeout(x.timer); agendados.clear(); },
     relogioOk: () => OC.offsetServidor != null,

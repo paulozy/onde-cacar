@@ -92,6 +92,7 @@
       saida_forcada: { modo: OC.ui?.prefs?.autoForcar ?? 'nao', rope: (() => { try { return JSON.parse(OC.ui?.prefs?.saida_rope)?.t ?? null; } catch { return null; } })(),
         desistir: (() => { try { return JSON.parse(OC.ui?.prefs?.saida_desistir)?.t ?? null; } catch { return null; } })() },
       mercado: OC.mercado ? { status: OC.mercado.status(), alvos: (OC.ui?.prefs?.mercadoAlvos ?? []).map((a) => ({ tipo: a.tipo, nome: a.nome, teto: a.teto, moeda: a.moeda, modo: a.modo, ativo: a.ativo, comprados: a.comprados })), registro: OC.mercado.registro().slice(0, 15), depois_da_compra: OC.mercado.posCompra() } : null,
+      preco: OC.preco ? { vendas_guardadas: OC.preco.total(), vitrine: OC.preco.vitrine() ? { ha_s: Math.round((Date.now() - OC.preco.vitrine().t) / 1000), anuncios: OC.preco.vitrine().linhas.length } : null } : null,
       automacao: OC.auto ? { status: OC.auto.status(), registro: (OC.auto.log?.() ?? []).slice(0, 20), bola_do_jogo: OC.bolaDoJogo?.() ?? null } : null,
       troca: { relogio_servidor_ms: OC.offsetServidor ?? null, troca_livre_em: OC.trocaLivreEm ?? null, livre_agora: OC.livreParaTrocar?.() ?? null,
         sabe_trocar_pokemon: OC.ui?.prefs?.ativar ? { t: OC.ui.prefs.ativar.t, campo: OC.ui.prefs.ativar.caminho } : null, simulando: OC.ui?.prefs?.pkUpar ?? null },
