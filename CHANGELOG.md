@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.8.1 — 02/11/2026
+
+### Corrigido
+- **Comissão do Mercado em Coins:** a avaliação de venda usava 10% e mostrava o valor recebido acima do real. Agora usa 15%, a mesma do ranking da Outland.
+- O diagnóstico mostra a versão certa da extensão (estava parado na 2.4.2).
+
 ## 2.8.0 — 02/11/2026
 
 ### Por quanto vender um pokémon seu
