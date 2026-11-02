@@ -146,3 +146,20 @@ tr.oc-dim td { opacity: .5; }
 .oc-pc-l3 small { opacity: .85; }
 .oc-pc-det { padding: 0 9px 9px; }
 .oc-pc-det .oc-tabela { margin-top: 0; }
+
+/* por quanto vender */
+.oc-vd { display: flex; flex-direction: column; gap: 6px; }
+.oc-vd-moeda { padding: 8px; border-radius: 7px; background: #33202b; box-shadow: inset 0 0 0 2px #480e1e; }
+.oc-vd-moeda h5 { margin: 0 0 6px; font-size: 13px; }
+.oc-vd-moeda h5 small { font-weight: 600; color: #e0a98f; margin-left: 4px; }
+.oc-vd-ops { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+@media (max-width: 420px) { .oc-vd-ops { grid-template-columns: 1fr; } }
+.oc-vd-op { display: flex; flex-direction: column; gap: 2px; padding: 6px; border-radius: 6px; background: #3a2430; }
+.oc-vd-op b { color: #ffe9a8; font-size: 13.5px; }
+.oc-vd-op small { font-size: 11px; color: #f5cdb9; }
+.oc-vd-op .oc-link { align-self: flex-start; font-size: 11.5px; }
+.oc-vd-rec { box-shadow: inset 0 0 0 2px #3f9a43; }
+.oc-vd-nota { display: flex; flex-direction: column; gap: 3px; font-size: 12px; font-weight: 700; color: #f5cdb9; }
+.oc-vd-nota .oc-num { width: 110px; background: #462b39; color: #fff6ef; border: 1px solid #480e1e; border-radius: 5px; padding: 4px; }
+.oc-vd-sel { background: #462b39; color: #fff6ef; border: 1px solid #480e1e; border-radius: 5px; padding: 5px; font: 600 13px "Barlow", system-ui, sans-serif; max-width: 100%; }
+.oc-vd-cands { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }

@@ -921,6 +921,8 @@
           ${blocoVizinhos(res, alvo)}`;
     }
     return `<div class="oc-ctrl"><label class="oc-chk"><input type="checkbox" data-pref="pcGaveta" ${prefs.pcGaveta === false ? '' : 'checked'}> Mostrar a gaveta de preço ao lado do Mercado do jogo</label></div>
+      ${secaoVenda()}
+      <h4 class="oc-sub">Anúncios na tela do Mercado</h4>
       ${listaPreco()}
       <h4 class="oc-sub">Avaliar um pokémon específico</h4>
       <div class="oc-form">
@@ -941,6 +943,179 @@
       <p class="oc-nota">Compara só com vendas da mesma espécie, na mesma moeda, com o mesmo brilho (e P5 só com P5), dos últimos 30 dias. As vendas mais recentes e mais parecidas em potência, nível, TM AoE, TM elemental e refino pesam mais, e cada uma é ajustada para a nota do anúncio. Uma venda isolada a preço absurdo não arrasta a conta: o preço justo é a mediana. ${num(OC.preco?.total() ?? 0)} vendas guardadas neste navegador, lidas da Tabela de preços do jogo (um pedido a cada 3 s, só quando você abre uma espécie ou clica em Avaliar). <button type="button" class="oc-link" data-acao="pc-esquecer">esquecer as vendas guardadas</button></p>`;
   }
 
+  // ---- Por quanto vender um pokémon seu ---------------------------------------------------------
+  const vd = { pkId: null, cache: new Map(), lendo: false, status: '', erro: null, ficha: null, modo: 'venda', modoAtivo: null };
+  const notasDigitadas = () => (prefs.vdNotas ??= {});
+  const nomePk = (p) => p?.apelido || jogo?.especies?.get?.(Number(p?.speciesId))?.name || p?.nome || `#${p?.speciesId}`;
+  const meuPk = (id) => (eu?.pokemons ?? []).find((p) => String(p.id) === String(id)) ?? null;
+
+  function redesenharVenda(forcar = false) {
+    if (painel && prefs.aba === 'preco' && (forcar || !painel.querySelector('input:focus, select:focus'))) desenhar();
+    desenharGaveta(forcar);
+    atualizarPilula();
+  }
+
+  async function avaliarVd(pk, forcar = false) {
+    if (!pk) return;
+    if (vd.lendo) { vd.pendente = { pk, forcar }; return; } // a ficha mudou no meio: avalia a nova quando esta acabar
+    vd.pkId = String(pk.id); vd.lendo = true; vd.erro = null; vd.status = 'avaliando…'; redesenharVenda(true);
+    try {
+      jogo ??= await OC.carregarJogo();
+      const res = await OC.venda.avaliarVenda(pk, { notaManual: notasDigitadas()[pk.id], forcar,
+        aoProgredir: (t) => { vd.status = t; redesenharVenda(); } });
+      vd.cache.set(String(pk.id), res);
+    } catch (e) { vd.erro = `Não consegui avaliar: ${e?.message ?? e}`; }
+    vd.lendo = false; vd.status = '';
+    const p = vd.pendente; vd.pendente = null;
+    if (p && String(p.pk.id) === String(vd.pkId)) return avaliarVd(p.pk, p.forcar);
+    redesenharVenda(true);
+  }
+
+  function blocoMoeda(m) {
+    const M = m.moeda, nomeM = M === 'orb' ? 'Gemas' : 'Coins', o = m.opcoes, c = m.conc;
+    const usd = (v) => (M === 'orb' ? ` <small>≈ US$ ${dec(v * OC.venda.USD_POR_GEMA, 2)}</small>` : '');
+    const concTxt = !c ? 'Não consegui olhar os anúncios abertos agora.'
+      : !c.total ? 'Nenhum anúncio aberto dessa espécie agora.'
+        : c.melhorMaisBarato ? `${c.total} anúncio${c.total > 1 ? 's' : ''} agora; o mais barato igual ou melhor que o seu pede ${precoTxt(c.melhorMaisBarato.preco, M)}, então nenhuma sugestão passa disso.`
+          : `${c.total} anúncio${c.total > 1 ? 's' : ''} agora, nenhum igual ou melhor que o seu (o mais barato pede ${precoTxt(c.maisBarato.preco, M)}).`;
+    if (!o) return `<div class="oc-vd-moeda"><h5>Em ${nomeM}</h5><p class="oc-nota">Sem venda parecida em ${nomeM} nos últimos 30 dias e sem anúncio igual ou melhor para comparar. ${esc(concTxt)}</p></div>`;
+    const col = (k, rot) => !o[k] ? '' : `<div class="oc-vd-op${k === 'justo' ? ' oc-vd-rec' : ''}"><span class="oc-rot">${rot}</span><b>${precoTxt(o[k], M)}</b>
+      <small>você recebe ${precoTxt(m.liquido(o[k]), M)}${usd(m.liquido(o[k]))}</small>
+      <button type="button" class="oc-link" data-vd-copiar="${o[k]}">copiar</button></div>`;
+    const base = m.est ? `Pelas vendas: justo ${precoTxt(m.est, M)}, faixa normal ${precoTxt(m.res.p25, M)} a ${precoTxt(m.res.p75, M)} (confiança ${m.res.confianca}, ${num(m.res.grupo)} vendas da espécie).`
+      : 'Sem venda parecida: as sugestões saem só dos anúncios abertos.';
+    return `<div class="oc-vd-moeda"><h5>Em ${nomeM} <small>comissão de ${Math.round(m.comissao * 100)}%</small></h5>
+      <div class="oc-vd-ops">${col('rapido', 'Vender rápido')}${col('justo', 'Preço justo')}${col('paciente', 'Sem pressa')}</div>
+      <p class="oc-nota">${base} ${esc(concTxt)}${m.pctNota != null ? ` A nota dele é maior que a de ${m.pctNota}% dos vendidos em ${nomeM}.` : ''}</p></div>`;
+  }
+
+  function cartaoVenda(res) {
+    const r = res.r;
+    const origem = { jogo: '', manual: ' <small>(digitada)</small>', estimada: ` <small>(estimada pelas vendas${r.notaErro >= 0.01 ? `, ±${dec(r.notaErro, 2)}` : ''})</small>`, sem: '' }[r.origemNota] ?? '';
+    const notaTxt = r.n == null ? 'nota ?' : `nota ${dec(r.n, 2)}${origem}`;
+    const pedirNota = r.origemNota !== 'jogo' ? `<label class="oc-vd-nota">${r.n == null ? 'Para avaliar, digite a nota da ficha (N=)' : 'A nota da ficha é outra? Digite (N=)'}
+      <input type="number" step="0.01" min="0" max="10" class="oc-num" data-vd-nota="${esc(r.pid)}" value="${esc(notasDigitadas()[r.pid] ?? '')}" placeholder="${r.n != null ? dec(r.n, 2) : 'ex.: 4,2'}"></label>` : '';
+    const tags = [r.sh && '<span class="oc-tag oc-bom">shiny</span>', r.aoe && '<span class="oc-tag">TM AoE</span>', r.el && `<span class="oc-tag">TM ${esc(r.el)}</span>`, r.rf ? `<span class="oc-tag">+${r.rf} refino</span>` : ''].filter(Boolean).join(' ');
+    const ouro = res.porMoeda?.find((m) => m.moeda === 'gold');
+    const npc = res.npc ? `No NPC ele vale ${precoTxt(res.npc, 'gold')}${ouro?.opcoes?.justo ? ` (no Mercado em Coins, o preço justo líquido dá ${dec(ouro.liquido(ouro.opcoes.justo) / res.npc, 1)}× isso)` : ''}.` : '';
+    return `<div class="oc-vd">
+      <div class="oc-pc-l1"><span><b>${esc(r.apelido || r.nome)}</b>${r.apelido ? ` <small>${esc(r.nome)}</small>` : ''} nv ${num(r.lv)} ${tags}</span></div>
+      <div class="oc-pc-l2">P${r.p} · ${notaTxt} · IV ${num(r.iv)} · Q ${dec(r.q, 3)}</div>
+      ${pedirNota}
+      ${!res.pode?.ok ? `<div class="oc-aviso">Não dá para anunciar: ${esc(res.pode.motivo)}.</div>` : ''}
+      ${res.lendario ? '<div class="oc-caixa">Lendário não tem nota, e o preço dele depende de outras coisas: a extensão ainda não avalia lendários.</div>' : ''}
+      ${r.n == null && !res.lendario ? '<div class="oc-caixa">Sem a nota não dá para comparar com as vendas: digite a nota da ficha acima.</div>' : (res.porMoeda ?? []).map(blocoMoeda).join('')}
+      ${npc ? `<p class="oc-nota">${npc}</p>` : ''}
+      <p class="oc-nota">Avaliado ${ha(res.em ?? Date.now())}. <button type="button" class="oc-link" data-vd-reavaliar="${esc(r.pid)}">reavaliar</button>${r.sh ? ' · shiny só é vendido em Gemas.' : ''}</p>
+    </div>`;
+  }
+
+  /** O que a avaliação mostra (o mesmo na aba Preço e na gaveta). */
+  function listaVenda() {
+    const cands = vd.ficha?.ids?.length > 1 && !vd.pkId ? vd.ficha.ids.map(meuPk).filter(Boolean) : null;
+    if (cands) return `<div class="oc-caixa">Essa ficha bate com mais de um pokémon seu. Qual é?</div>
+      <div class="oc-vd-cands">${cands.map((p) => `<button type="button" class="oc-btn" data-vd-escolher="${esc(p.id)}">${esc(nomePk(p))} nv ${num(p.level)} P${p.potencia || 1} Q ${dec(Number(p.quality ?? p.qualidade) || 0, 3)}</button>`).join('')}</div>`;
+    const pk = meuPk(vd.pkId);
+    if (!pk) return '<div class="oc-caixa">Abra a ficha de um pokémon seu no jogo, ou escolha um na aba Preço do painel.</div>';
+    const res = vd.cache.get(String(pk.id));
+    return `${vd.status ? `<div class="oc-nota">${esc(vd.status)}</div>` : ''}${vd.erro ? `<div class="oc-aviso">${esc(vd.erro)}</div>` : ''}
+      ${res ? cartaoVenda(res) : vd.lendo ? '' : `<div class="oc-caixa">${esc(nomePk(pk))} nv ${num(pk.level)}: <button type="button" class="oc-link" data-vd-reavaliar="${esc(pk.id)}">avaliar</button></div>`}`;
+  }
+
+  /** Seção da aba Preço: escolher um pokémon da box. */
+  function secaoVenda() {
+    const meus = (eu?.pokemons ?? []).slice().sort((a, b) => ((b.id === eu.activeId) - (a.id === eu.activeId)) || ((Number(b.level) || 0) - (Number(a.level) || 0)));
+    if (!meus.length) return '';
+    const opts = meus.map((p) => `<option value="${esc(p.id)}" ${String(p.id) === String(vd.pkId) ? 'selected' : ''}>${esc(nomePk(p))} · nv ${num(p.level)} · P${p.potencia || 1}${p.shiny ? ' · shiny' : ''}${p.id === eu.activeId ? ' · em campo' : ''}</option>`).join('');
+    return `<h4 class="oc-sub">Por quanto vender um pokémon seu</h4>
+      <div class="oc-ctrl"><select class="oc-vd-sel" data-vd-sel>${vd.pkId ? '' : '<option value="">escolha…</option>'}${opts}</select>
+        <button type="button" class="oc-btn" data-vd-avaliar ${vd.lendo ? 'disabled' : ''}>Avaliar</button>
+        <label class="oc-chk"><input type="checkbox" data-pref="vendaFicha" ${prefs.vendaFicha === false ? '' : 'checked'}> avaliar sozinho ao abrir a ficha no jogo</label></div>
+      ${vd.pkId ? listaVenda() : ''}`;
+  }
+
+  function ligarVenda(raiz) {
+    raiz.querySelector('[data-vd-sel]')?.addEventListener('change', (e) => { vd.pkId = e.target.value || null; vd.erro = null; redesenharVenda(true); });
+    raiz.querySelector('[data-vd-avaliar]')?.addEventListener('click', () => { const pk = meuPk(raiz.querySelector('[data-vd-sel]')?.value); if (pk) avaliarVd(pk); });
+    for (const b of raiz.querySelectorAll('[data-vd-reavaliar]')) b.addEventListener('click', () => avaliarVd(meuPk(b.dataset.vdReavaliar), true));
+    for (const b of raiz.querySelectorAll('[data-vd-escolher]')) b.addEventListener('click', () => { const pk = meuPk(b.dataset.vdEscolher); vd.pkId = String(pk.id); vd.ficha.ids = [vd.pkId]; if (!vd.cache.has(vd.pkId)) avaliarVd(pk); else redesenharVenda(true); });
+    for (const el of raiz.querySelectorAll('[data-vd-nota]')) el.addEventListener('change', () => {
+      const v = Number(String(el.value).replace(',', '.')), id = el.dataset.vdNota;
+      if (v > 0 && v <= 10) notasDigitadas()[id] = v; else delete notasDigitadas()[id];
+      salvarPrefs(); avaliarVd(meuPk(id));
+    });
+    for (const b of raiz.querySelectorAll('[data-vd-copiar]')) b.addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText(String(b.dataset.vdCopiar)); b.textContent = 'copiado'; } catch { b.textContent = 'não deu para copiar'; }
+      setTimeout(() => { b.textContent = 'copiar'; }, 1500);
+    });
+    for (const b of raiz.querySelectorAll('[data-gv-modo]')) b.addEventListener('click', () => { vd.modo = b.dataset.gvModo; controlarGaveta(); desenharGaveta(true); });
+  }
+
+  // ---- a ficha aberta no jogo: qual pokémon seu está na tela ------------------------------------
+  // Não sabemos a marcação da ficha do jogo, então procuramos uma janela visível cujo texto traga o
+  // nome e o nível de um pokémon seu; qualidade, IV e potência desempatam entre iguais.
+  const SELETOR_JANELA = '[role="dialog"], dialog[open], [class*="modal"], [class*="Modal"], [class*="ficha"], [class*="Ficha"], [class*="janela"], [class*="popup"]';
+  const visivel = (el) => el.isConnected && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
+  function fichaNaTela() {
+    const meus = eu?.pokemons ?? [];
+    if (!meus.length) return null;
+    let achada = null;
+    for (const el of document.querySelectorAll(SELETOR_JANELA)) {
+      if (el.closest('.oc-painel, .oc-pilula') || !visivel(el)) continue;
+      const txt = (el.innerText || el.textContent || '').slice(0, 8000);
+      if (txt.length < 8 || /MERCADO DA COMUNIDADE/i.test(txt)) continue;
+      if (achada && txt.length >= achada.len) continue; // a janela mais interna que bate é a ficha
+      const baixo = txt.toLowerCase();
+      const pontos = [];
+      for (const pk of meus) {
+        const lv = Number(pk.level);
+        if (!lv) continue;
+        const nomes = [pk.apelido, pk.nome, jogo?.especies?.get?.(Number(pk.speciesId))?.name].filter(Boolean).map((x) => String(x).toLowerCase());
+        if (!nomes.some((n) => baixo.includes(n))) continue;
+        if (!new RegExp(`(?:nv|lv|n[íi]vel|level)\\.?\\s*:?\\s*${lv}(?![\\d.,])`, 'i').test(txt)) continue;
+        const q = Number(pk.quality ?? pk.qualidade) || 0, iv = Number(pk.ivTotal) || Object.values(pk.ivs ?? {}).reduce((s, v) => s + (Number(v) || 0), 0);
+        let s = 0;
+        if (pk.apelido && baixo.includes(String(pk.apelido).toLowerCase())) s += 3;
+        if (q > 0 && [q.toFixed(3), q.toFixed(3).replace('.', ','), q.toFixed(2).replace('.', ',')].some((x) => txt.includes(x))) s += 3;
+        if (iv > 0 && new RegExp(`\\b${iv}\\b`).test(txt)) s += 1;
+        if (new RegExp(`\\bP${Number(pk.potencia) || 1}\\b`).test(txt)) s += 1;
+        pontos.push({ pk, s });
+      }
+      if (!pontos.length) continue;
+      const max = Math.max(...pontos.map((x) => x.s));
+      achada = { el, len: txt.length, ids: pontos.filter((x) => x.s === max).map((x) => String(x.pk.id)) };
+    }
+    return achada;
+  }
+  function detectarFicha() {
+    if (prefs.vendaFicha === false || !eu) return;
+    const f = fichaNaTela();
+    if (!f) return;
+    const mesma = vd.ficha && vd.ficha.ids.join() === f.ids.join();
+    vd.ficha = { el: f.el, ids: f.ids };
+    if (mesma) return;
+    vd.modo = 'venda'; vd.erro = null;
+    if (f.ids.length === 1) {
+      vd.pkId = f.ids[0];
+      const c = vd.cache.get(vd.pkId);
+      if (!c || Date.now() - c.em > 10 * 60000) avaliarVd(meuPk(vd.pkId));
+    } else vd.pkId = null;
+    controlarGaveta(); desenharGaveta(true);
+  }
+  /** A ficha continua aberta? O jogo pode redesenhar a janela: procura de novo antes de dar por fechada. */
+  function fichaViva() {
+    if (!vd.ficha) return false;
+    if (visivel(vd.ficha.el)) return true;
+    const f = fichaNaTela();
+    if (f && f.ids.join() === vd.ficha.ids.join()) { vd.ficha.el = f.el; return true; }
+    vd.ficha = null;
+    return false;
+  }
+  root.addEventListener('click', (e) => {
+    if (naExtensao(e.target)) return;
+    setTimeout(detectarFicha, 350); setTimeout(detectarFicha, 1100);
+  }, true);
+
   // ---- a gaveta ao lado do Mercado do jogo ----------------------------------------------------
   /** Cliques dentro da extensão não chegam ao jogo: senão o jogo entende "clicou fora" e fecha o Mercado. */
   const naExtensao = (t) => !!t?.closest?.('.oc-painel, .oc-pilula');
@@ -951,11 +1126,14 @@
     if (!gaveta) return;
     if (!forcar && gaveta.querySelector('input:focus')) return;
     const sc = gaveta.querySelector('.oc-gv-corpo')?.scrollTop ?? 0;
+    const venda = vd.modoAtivo === 'venda';
+    const doisModos = vd.ficha && prefs.pcGaveta !== false && !!OC.mercado?.naTela?.();
     gaveta.className = `oc-painel oc-gaveta${prefs.pcLado === 'esq' ? ' oc-esq' : ''}`;
-    gaveta.innerHTML = `<div class="oc-cab"><div class="oc-titulo"><h3>Preço justo</h3><small>vendas reais dos últimos 30 dias</small></div>
+    gaveta.innerHTML = `<div class="oc-cab"><div class="oc-titulo"><h3>${venda ? 'Por quanto vender' : 'Preço justo'}</h3><small>${venda ? 'vendas reais e anúncios abertos agora' : 'vendas reais dos últimos 30 dias'}</small></div>
         <button type="button" class="oc-fechar" data-gv="lado" title="Mudar de lado" aria-label="Mudar de lado">⇆</button>
         <button type="button" class="oc-fechar" data-gv="recolher" title="Recolher" aria-label="Recolher">–</button></div>
-      <div class="oc-gv-corpo">${listaPreco()}</div>`;
+      ${doisModos ? `<div class="oc-ctrl"><span class="oc-seg">${[['venda', 'Este pokémon'], ['mercado', 'Anúncios na tela']].map(([k, r]) => `<button type="button" data-gv-modo="${k}" aria-pressed="${vd.modoAtivo === k}">${r}</button>`).join('')}</span></div>` : ''}
+      <div class="oc-gv-corpo">${venda ? listaVenda() : listaPreco()}</div>`;
     gaveta.querySelector('.oc-gv-corpo').scrollTop = sc;
     ligarPreco(gaveta);
     gaveta.querySelector('[data-gv="lado"]').addEventListener('click', () => { prefs.pcLado = prefs.pcLado === 'esq' ? 'dir' : 'esq'; salvarPrefs(); desenharGaveta(true); });
@@ -963,32 +1141,46 @@
   }
   function atualizarPilula() {
     if (!pilula) return;
-    const r = anunciosAvaliados();
     pilula.className = `oc-pilula${prefs.pcLado === 'esq' ? ' oc-esq' : ''}`;
+    if (vd.modoAtivo === 'venda') {
+      const res = vd.cache.get(String(vd.pkId)), m = res?.porMoeda?.find((x) => x.opcoes);
+      pilula.innerHTML = `💰 Vender${m ? ` <b>${esc(curto(m.opcoes.justo))}</b>` : ''}`;
+      pilula.title = m ? `Preço justo em ${m.moeda === 'orb' ? 'Gemas' : 'Coins'}: ${precoTxt(m.opcoes.justo, m.moeda)}` : 'Por quanto vender este pokémon';
+      return;
+    }
+    const r = anunciosAvaliados();
     pilula.innerHTML = `💰 Preço justo${r?.baratos ? ` <b>${r.baratos}</b>` : ''}`;
     pilula.title = r ? `${r.todos.length} anúncios avaliados${r.baratos ? `, ${r.baratos} baratos` : ''}` : 'Abra uma espécie no Mercado';
   }
-  /** Mostra a gaveta (ou a abinha recolhida) enquanto o Mercado do jogo estiver na tela. */
+  /** Mostra a gaveta (ou a abinha recolhida) com o Mercado do jogo ou uma ficha sua na tela. */
   function controlarGaveta() {
     if (!document.body) return;
-    const naTela = prefs.pcGaveta !== false && !!OC.mercado?.naTela?.();
-    if (!naTela) { gaveta?.remove(); gaveta = null; pilula?.remove(); pilula = null; return; }
+    const mercado = prefs.pcGaveta !== false && !!OC.mercado?.naTela?.();
+    const ficha = prefs.vendaFicha !== false && fichaViva();
+    const antes = vd.modoAtivo;
+    vd.modoAtivo = ficha && (vd.modo === 'venda' || !mercado) ? 'venda' : mercado ? 'mercado' : null;
+    if (!vd.modoAtivo) { gaveta?.remove(); gaveta = null; pilula?.remove(); pilula = null; return; }
     if (!prefs.pcGavetaRecolhida) {
       pilula?.remove(); pilula = null;
-      if (!gaveta) { gaveta = isolar(document.createElement('div')); gaveta.setAttribute('role', 'complementary'); gaveta.setAttribute('aria-label', 'Preço justo'); document.body.append(gaveta); desenharGaveta(true); lerVitrine(); }
+      if (!gaveta) {
+        gaveta = isolar(document.createElement('div')); gaveta.setAttribute('role', 'complementary'); gaveta.setAttribute('aria-label', 'Preço justo');
+        document.body.append(gaveta); desenharGaveta(true); if (mercado) lerVitrine();
+      } else if (antes !== vd.modoAtivo) desenharGaveta(true);
     } else {
       gaveta?.remove(); gaveta = null;
       if (!pilula) {
         pilula = isolar(document.createElement('button')); pilula.type = 'button';
         pilula.addEventListener('click', () => { prefs.pcGavetaRecolhida = false; salvarPrefs(); controlarGaveta(); });
-        document.body.append(pilula); atualizarPilula();
+        document.body.append(pilula);
       }
+      atualizarPilula();
     }
   }
   setInterval(controlarGaveta, 700);
 
   /** Os controles do preço, no painel ou na gaveta. */
   function ligarPreco(raiz) {
+    ligarVenda(raiz);
     for (const b of raiz.querySelectorAll('[data-pcf-moeda]')) b.addEventListener('click', () => { pcF().moeda = b.dataset.pcfMoeda; salvarPrefs(); redesenharPreco(true); });
     for (const el of raiz.querySelectorAll('[data-pcf]')) el.addEventListener('change', () => {
       pcF()[el.dataset.pcf] = el.type === 'checkbox' ? el.checked : el.value; salvarPrefs(); redesenharPreco(true);
@@ -1238,5 +1430,6 @@
   OC.on('preco', () => { pc.aberto = null; redesenharPreco(); if (gaveta || pilula || (painel && prefs.aba === 'preco')) lerVitrine(); });
   OC.on('auto', () => { if (painel && (prefs.aba === 'setup' || prefs.aba === 'ajustes' || prefs.aba === 'hunts') && !painel.querySelector('input:focus, select:focus')) desenhar(); });
   OC.ui = { abrir, fechar, desenhar, prefs, salvarPrefs, analiseFresca: async () => { await recalcular(false); return analise; },
+    _ficha: () => { const f = fichaNaTela(); return f && { ids: f.ids, len: f.len, cls: f.el.className }; }, _vd: () => ({ pkId: vd.pkId, ids: vd.ficha?.ids, lendo: vd.lendo, modo: vd.modoAtivo }),
     interno: () => ({ welcome, eu, jogo, itens, analise, xpDoTreinador: eu ? xpDoTreinador() : null, ritmo: eu ? ritmoTreinador() : null }) };
 })(globalThis);

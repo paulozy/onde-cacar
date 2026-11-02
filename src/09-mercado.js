@@ -351,6 +351,12 @@
     categorias: CATEGORIAS,
     lerMedias: () => lerMedias(true),
     pedir, naTela: mercadoNaTela, shinyDe,
+    /** Vitrine de uma espécie pedida pela extensão: marcada para o price check não tomar como a da tela. */
+    listarVitrine: async ({ especieId, moeda, soShiny = false }) => {
+      const msg = { ...filtrosPokemon({ moeda, especieId, filtros: { shiny: soShiny ? 'so' : 'qualquer' } }), ordem: 'baratos' };
+      listouEm = Date.now();
+      try { return await pedir(msg, (m) => m.aba === 'vitrine'); } finally { listouEm = Date.now(); }
+    },
     /** Depois de editar um alvo: os anúncios que ele já tinha descartado voltam a ser olhados. */
     reolhar: (alvoId) => { for (const [id, v] of vistos) if (v.alvo === alvoId && !agendados.has(id)) vistos.delete(id); olhadoEm.delete(alvoId); }, listouAgora: () => Date.now() - listouEm < 8000,
     preco: (v, moeda) => (moeda === 'orb' ? `${Number(v).toLocaleString('pt-BR')} Gemas` : `${Number(v).toLocaleString('pt-BR')} Coins`),

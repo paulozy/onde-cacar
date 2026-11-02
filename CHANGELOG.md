@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.8.0 — 02/11/2026
+
+### Por quanto vender um pokémon seu
+- **Ao abrir a ficha de um pokémon seu no jogo**, a gaveta lateral abre sozinha com a avaliação de venda: preço em Coins e em Gemas (shiny só em Gemas), cada um em três faixas, vender rápido, preço justo e sem pressa, com quanto você recebe depois da comissão (10% em Coins, 15% em Gemas) e o equivalente em US$ das Gemas. Um botão copia o número para colar no anúncio.
+- **A concorrência entra na conta:** a extensão olha os anúncios abertos da espécie e nenhuma sugestão passa do mais barato igual ou melhor que o seu, porque acima disso o comprador leva o outro. Quando isso trava o preço, "sem pressa" some.
+- **Quão bom ele é:** a nota dele contra as dos vendidos da espécie nos últimos 30 dias, e o valor no NPC para comparar.
+- **Pode ou não ir ao Mercado:** avisa quando não dá (nota abaixo de 3,5 ou nível abaixo de 50, sem ser shiny nem P5; pokémon inicial).
+- **Nota:** usa a do jogo quando ele manda. Senão, estima pelas vendas da espécie (a nota mede o nascimento: qualidade, IV, potência e refino) e mostra que é estimada. Dá para digitar a nota da ficha, e a digitada fica guardada.
+- **Na aba Preço**, a seção "Por quanto vender um pokémon seu" avalia qualquer pokémon da box sem abrir a ficha. Lá também liga ou desliga a avaliação automática.
+- Com o Mercado e uma ficha abertos ao mesmo tempo, a gaveta tem as abas "Este pokémon" e "Anúncios na tela".
+
 ## 2.7.0 — 02/11/2026
 
 ### Preço justo ao lado do Mercado
