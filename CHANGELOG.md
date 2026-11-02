@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.7.0 — 02/11/2026
+
+### Preço justo ao lado do Mercado
+- **Gaveta "Preço justo":** abre sozinha na lateral da tela quando o Mercado do jogo está aberto, por cima dele, sem tampar o meio. Clicou numa espécie, os anúncios aparecem avaliados ali mesmo, sem precisar sair do Mercado nem abrir o painel. Dá para trocar de lado (⇆) e recolher (–) numa abinha que mostra quantos anúncios estão baratos. Desliga na aba Preço.
+- **Filtros:** Gemas ou Coins, só baratos ou barato e justo, shiny (tanto faz, só, sem), potência mínima, nota mínima e esconder quem tem igual ou melhor por menos. Ordena por melhor negócio, menor preço, maior nota ou maior nível. Os filtros ficam guardados e valem na gaveta e na aba Preço.
+- **Anúncios em cartões**, que cabem na gaveta: preço, preço justo, faixa normal, diferença e veredito à vista; um clique abre as vendas parecidas e o "comparar com o meu".
+
+### Corrigido
+- Clicar no painel ou na gaveta não chega mais ao jogo como "clique fora da janela", o que podia fechar o Mercado do jogo. Teclas digitadas nos campos da extensão também não vão mais para o jogo.
+
 ## 2.6.0 — 02/11/2026
 
 ### Mercado: alvos de compra refeitos

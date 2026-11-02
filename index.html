@@ -130,6 +130,10 @@
   .duas li { margin-bottom: 6px; }
   .duas li::marker { color: var(--ouro); }
 
+  .resto { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 28px 48px; margin: 56px 0 0; }
+  .resto dt { font: 700 24px/1.1 var(--display); color: var(--ouro-claro); margin-bottom: 4px; }
+  .resto dd { margin: 0; color: var(--creme-suave); }
+
   .passos { counter-reset: p; list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 28px 32px; }
   .passos li { counter-increment: p; position: relative; padding-left: 52px; color: var(--creme-suave); }
   .passos li::before {
@@ -139,7 +143,7 @@
   }
   .passos strong { display: block; color: var(--creme); font-size: 18px; }
   code { font-family: ui-monospace, Consolas, monospace; font-size: .9em; background: var(--carvao); color: var(--creme); padding: 1px 6px; border-radius: 4px; }
-  .bloco .firefox { margin: 36px 0 0; color: var(--creme-suave); max-width: 46em; }
+  .bloco > .miolo > p.firefox { margin: 36px 0 0; color: var(--creme-suave); max-width: 46em; }
 
   .selo { display: flex; gap: 20px; align-items: flex-start; }
   .selo p { max-width: 40em; }
@@ -167,6 +171,7 @@
   <img src="icons/48.png" alt="" width="40" height="40">
   <strong>Onde Caçar</strong>
   <nav style="display:flex;gap:20px">
+    <a href="#mercado">Mercado</a>
     <a href="#instalar">Instalar</a>
     <a href="https://github.com/paulozy/onde-cacar">Código no GitHub</a>
   </nav>
@@ -176,12 +181,12 @@
   <div class="miolo hero">
     <div>
       <h1>Onde caçar agora, <span>e com o quê.</span></h1>
-      <p class="lead">Uma extensão gratuita para quem joga PokeIdle. Ela simula o seu pokémon em campo em todas as hunts liberadas e mostra a que rende mais XP, a poção e a pokébola certas e quanto levar na mochila.</p>
+      <p class="lead">Uma extensão gratuita para quem joga PokeIdle. Ela simula o seu pokémon em campo em todas as hunts liberadas e mostra a que rende mais XP, a poção e a pokébola certas e quanto levar na mochila. No Mercado, ela diz se o preço de um pokémon é justo.</p>
       <div class="baixar">
-        <a class="btn" href="https://github.com/paulozy/onde-cacar/releases/download/v2.6.0/onde-cacar-2.6.0-chrome-edge-opera.zip">Baixar para Chrome, Edge e Opera</a>
-        <a class="btn btn-escuro" href="https://github.com/paulozy/onde-cacar/releases/download/v2.6.0/onde-cacar-2.6.0-firefox.zip">Baixar para Firefox</a>
+        <a class="btn" href="https://github.com/paulozy/onde-cacar/releases/download/v2.7.0/onde-cacar-2.7.0-chrome-edge-opera.zip">Baixar para Chrome, Edge e Opera</a>
+        <a class="btn btn-escuro" href="https://github.com/paulozy/onde-cacar/releases/download/v2.7.0/onde-cacar-2.7.0-firefox.zip">Baixar para Firefox</a>
       </div>
-      <p class="versao">Versão 2.6.0. <a href="https://github.com/paulozy/onde-cacar/releases">Todas as versões</a></p>
+      <p class="versao">Versão 2.7.0. <a href="https://github.com/paulozy/onde-cacar/releases">Todas as versões</a></p>
     </div>
 
     <div class="painel entra" aria-label="Exemplo do painel da extensão">
@@ -227,6 +232,43 @@
             <li>uma ação a cada 2,5 segundos</li>
             <li>troca de área só fora de combate; numa hunt que não para de lutar, sai com Escape Rope ou desistindo, se você permitir</li>
             <li>registro de tudo o que fez, em Ajustes</li>
+          </ul>
+        </div>
+      </div>
+      <dl class="resto">
+        <div><dt>Outland</dt><dd>A melhor das 58 hunts para farmar Bronze Boss Token e fragmentos, já no tier mais alto que você liberou, com o valor por hora pelos preços do Mercado.</dd></div>
+        <div><dt>Upar outro pokémon</dt><dd>Escolha qualquer pokémon da equipe e veja as hunts para ele sem tirar quem está em campo.</dd></div>
+        <div><dt>Capturar</dt><dd>Em que hunts uma espécie aparece, quantas dela você derruba por hora e quanto tempo leva para sair uma P3+ ou uma shiny.</dd></div>
+        <div><dt>Drops</dt><dd>O que caiu desde o começo da medição, contra o que a regra do jogo promete.</dd></div>
+        <div><dt>Dias Sazonais e ginásios</dt><dd>A tipagem do dia, que vira às 18:00, e o seu lugar no pódio de cada ginásio entram no dano.</dd></div>
+        <div><dt>Progresso</dt><dd>Quanto XP e quanto tempo faltam para os próximos marcos, contando cada boost só até ele vencer.</dd></div>
+      </dl>
+    </div>
+  </section>
+
+  <section class="bloco" id="mercado">
+    <div class="miolo">
+      <h2>Mercado sem chute</h2>
+      <p>A extensão lê as vendas de verdade do Mercado da Comunidade e compara cada anúncio com elas, para você saber quando um preço é bom antes de pagar.</p>
+      <div class="duas">
+        <div>
+          <h3>Preço justo, do lado do Mercado</h3>
+          <p>Abra uma espécie no Mercado do jogo e uma gaveta aparece na lateral, com cada anúncio avaliado:</p>
+          <ul>
+            <li>preço justo pelas vendas dos últimos 30 dias da mesma espécie, puxadas para a nota do anúncio</li>
+            <li>faixa normal de preço e um veredito: barato, justo, caro ou muito caro</li>
+            <li>aviso quando há um igual ou melhor por menos na mesma vitrine</li>
+            <li>quanto XP/h ele faria no nível do seu pokémon, e o custo de cada +1%</li>
+          </ul>
+        </div>
+        <div>
+          <h3>Alvos de compra</h3>
+          <p>Diga o que procura (um item, ou um pokémon com filtros de potência, nota, IV, nível e shiny) e o preço máximo, ou o desconto mínimo sobre o preço justo. A extensão confere a cada ~20 s e avisa quando aparece. Se você quiser, ela também pede a compra dentro do sorteio do jogo, com travas:</p>
+          <ul>
+            <li>limite de gasto por dia, e Gemas desligadas até você ligar</li>
+            <li>quantidade máxima por alvo</li>
+            <li>um pedido ao Mercado a cada 3 segundos</li>
+            <li>nada roda com o Mercado desligado</li>
           </ul>
         </div>
       </div>

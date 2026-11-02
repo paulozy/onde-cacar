@@ -107,7 +107,7 @@
   // ---- o painel --------------------------------------------------------------------------
   function alternar() { if (painel) fechar(); else abrir(); }
   function abrir() {
-    painel = document.createElement('div');
+    painel = isolar(document.createElement('div'));
     painel.className = 'oc-painel';
     painel.setAttribute('role', 'dialog');
     painel.setAttribute('aria-label', 'Onde caçar');
@@ -764,12 +764,24 @@
   }
 
   // ---- Preço justo (price check) -------------------------------------------------------------
+  // Aparece em dois lugares com o mesmo conteúdo: na aba Preço do painel e na gaveta que abre ao lado
+  // do Mercado do jogo (o painel fica no meio da tela e tamparia o Mercado).
   const pc = { status: '', erro: null, aberto: null, lendo: false, lidoVitrine: 0, paraMim: new Map(), manualRes: null,
     manual: { nome: '', nivel: '', pot: '1', nota: '', shiny: false, aoe: false, el: false, rf: '', preco: '', moeda: 'orb' } };
   const ha = (ms) => { const m = Math.max(0, (Date.now() - ms) / 60000); return m < 60 ? `há ${Math.max(1, Math.round(m))} min` : m < 48 * 60 ? `há ${Math.round(m / 60)} h` : `há ${Math.round(m / 1440)} dias`; };
-  const precoTxt = (v, moeda) => (Number.isFinite(v) ? `${curto(Math.round(v))} ${moeda === 'orb' ? 'Gemas' : 'Coins'}` : '—');
+  const precoTxt = (v, moeda) => (Number.isFinite(v) ? `${num(Math.round(v))} ${moeda === 'orb' ? 'Gemas' : 'Coins'}` : '—');
   const tagVer = { barato: 'oc-bom', justo: '', caro: 'oc-atencao', 'muito caro': 'oc-ruim' };
   const etiquetas = (a) => [a.sh && '<span class="oc-tag oc-bom">shiny</span>', a.aoe && '<span class="oc-tag">TM AoE</span>', a.el && `<span class="oc-tag">TM ${esc(a.el)}</span>`, a.rf ? `<span class="oc-tag">+${a.rf} refino</span>` : ''].filter(Boolean).join(' ');
+  const pcFiltroPadrao = { moeda: 'todas', ver: 'todos', ordem: 'negocio', shiny: 'qualquer', potMin: '', notaMin: '', semDominados: false };
+  const pcF = () => (prefs.pcFiltro = { ...pcFiltroPadrao, ...(prefs.pcFiltro ?? {}) });
+  let gaveta = null, pilula = null;
+
+  /** Redesenha onde o preço aparece. Sem `forcar`, não atropela quem está digitando. */
+  function redesenharPreco(forcar = false) {
+    if (painel && prefs.aba === 'preco' && (forcar || !painel.querySelector('input:focus, select:focus, textarea:focus'))) desenhar();
+    desenharGaveta(forcar);
+    atualizarPilula();
+  }
 
   async function lerVitrine(forcar = false) {
     const v = OC.preco?.vitrine();
@@ -779,12 +791,13 @@
       const grupos = new Map();
       for (const l of v.linhas) { const a = OC.preco.resumir(l.ficha); grupos.set(`${a.sp}:${a.sh}`, a); }
       for (const a of [...grupos.values()].slice(0, 3)) {
-        pc.status = `lendo as vendas de ${a.nome}${a.sh ? ' shiny' : ''}…`; desenhar();
-        await OC.preco.ler(a.sp, a.nome, a.sh, { forcar, aoProgredir: (n) => { pc.status = `lendo as vendas de ${a.nome}${a.sh ? ' shiny' : ''}: página ${n}`; desenhar(); } });
+        const nome = `${a.nome}${a.sh ? ' shiny' : ''}`;
+        pc.status = `lendo as vendas de ${nome}…`; redesenharPreco();
+        await OC.preco.ler(a.sp, a.nome, a.sh, { forcar, aoProgredir: (n) => { pc.status = `lendo as vendas de ${nome}: página ${n}`; redesenharPreco(); } });
       }
       pc.lidoVitrine = v.t; pc.status = '';
     } catch (e) { pc.erro = e?.message ?? String(e); pc.status = ''; }
-    pc.lendo = false; desenhar();
+    pc.lendo = false; redesenharPreco();
   }
 
   /** XP/h que o pokémon do anúncio faria no nível do seu, comparado ao seu, nas mesmas hunts. */
@@ -822,36 +835,80 @@
       <p class="oc-nota">As ${res.vizinhos.length} vendas mais parecidas entre ${num(res.grupo)} da espécie nos últimos 30 dias, das que mais pesam para as que menos pesam. “Na nota” é o preço da venda puxado para a nota deste anúncio: nas vendas desta espécie, cada ponto de nota ${res.bMedida ? 'multiplicou' : 'multiplica (estimativa padrão, poucas vendas para medir)'} o preço por ${dec(Math.exp(res.b), 1)}. Confiança <b>${res.confianca}</b>${res.confianca !== 'boa' ? ': poucas vendas parecidas, use como referência solta' : ''}.</p>`;
   }
 
-  function abaPreco() {
+  /** Os anúncios da vitrine avaliados, filtrados e na ordem escolhida. */
+  function anunciosAvaliados() {
+    const v = OC.preco?.vitrine();
+    if (!v) return null;
+    const todos = v.linhas.map((l) => {
+      const a = OC.preco.resumir(l.ficha), preco = Number(l.preco);
+      return { l, a, preco, res: OC.preco.avaliar({ ...a, moeda: l.moeda, preco }), melhor: OC.preco.melhorPorMenos(l, v.linhas) };
+    });
+    const f = pcF(), notaMin = Number(String(f.notaMin).replace(',', '.')) || 0;
+    const passa = todos.filter((x) => (f.moeda === 'todas' || x.l.moeda === f.moeda)
+      && (f.shiny === 'qualquer' || (f.shiny === 'so') === x.a.sh)
+      && (!f.potMin || x.a.p >= Number(f.potMin))
+      && (!notaMin || x.a.n >= notaMin)
+      && (!f.semDominados || !x.melhor)
+      && (f.ver === 'todos' || (f.ver === 'barato' ? x.res?.veredito === 'barato' : x.res?.veredito === 'barato' || x.res?.veredito === 'justo')));
+    const moedaOrd = (x) => (x.l.moeda === 'orb' ? 0 : 1);
+    const ordem = {
+      negocio: (x, y) => (x.res?.delta ?? 9) - (y.res?.delta ?? 9),
+      preco: (x, y) => moedaOrd(x) - moedaOrd(y) || x.preco - y.preco,
+      nota: (x, y) => y.a.n - x.a.n,
+      nivel: (x, y) => y.a.lv - x.a.lv,
+    }[f.ordem] ?? ((x, y) => (x.res?.delta ?? 9) - (y.res?.delta ?? 9));
+    return { v, todos, lista: passa.sort(ordem), baratos: todos.filter((x) => x.res?.veredito === 'barato').length };
+  }
+
+  function filtrosPreco(todos) {
+    const f = pcF(), opt = (v, r, at) => `<option value="${esc(v)}" ${String(at) === String(v) ? 'selected' : ''}>${r}</option>`;
+    const temOrb = todos.some((x) => x.l.moeda === 'orb'), temGold = todos.some((x) => x.l.moeda === 'gold');
+    return `<div class="oc-pc-filtros">
+      <span class="oc-seg">${[['todas', 'Todas'], ['orb', `Gemas${temOrb ? '' : ' (0)'}`], ['gold', `Coins${temGold ? '' : ' (0)'}`]].map(([k, r]) => `<button type="button" data-pcf-moeda="${k}" aria-pressed="${f.moeda === k}">${r}</button>`).join('')}</span>
+      <select data-pcf="ordem" title="Ordenar">${opt('negocio', 'Melhor negócio', f.ordem)}${opt('preco', 'Menor preço', f.ordem)}${opt('nota', 'Maior nota', f.ordem)}${opt('nivel', 'Maior nível', f.ordem)}</select>
+      <select data-pcf="ver" title="Veredito">${opt('todos', 'Todos os preços', f.ver)}${opt('justo', 'Barato ou justo', f.ver)}${opt('barato', 'Só baratos', f.ver)}</select>
+      <select data-pcf="shiny" title="Shiny">${opt('qualquer', 'Shiny: tanto faz', f.shiny)}${opt('so', 'Só shiny', f.shiny)}${opt('nao', 'Sem shiny', f.shiny)}</select>
+      <select data-pcf="potMin" title="Potência mínima">${opt('', 'Qualquer potência', f.potMin)}${[2, 3, 4, 5].map((p) => opt(p, `P${p} ou mais`, f.potMin)).join('')}</select>
+      <input type="number" class="oc-num" data-pcf="notaMin" min="0" max="10" step="0.1" value="${esc(f.notaMin)}" placeholder="nota mín." title="Nota mínima">
+      <label class="oc-chk"><input type="checkbox" data-pcf="semDominados" ${f.semDominados ? 'checked' : ''}> esconder quem tem igual ou melhor por menos</label>
+      ${JSON.stringify(f) !== JSON.stringify(pcFiltroPadrao) ? '<button type="button" class="oc-link" data-pcf-limpar>limpar filtros</button>' : ''}
+    </div>`;
+  }
+
+  function cartaoAnuncio({ l, a, preco, res, melhor }, agoraS) {
+    const chave = `v${l.id}`, aberto = pc.aberto === chave;
+    const retido = Number(l.compravelEm) > agoraS ? ` · <span class="oc-nota">retido mais ${Math.ceil((Number(l.compravelEm) - agoraS) / 1000)} s</span>` : '';
+    const justo = res?.estimado ? `justo <b>${precoTxt(res.estimado, l.moeda)}</b> <small>(normal ${curto(Math.round(res.p25))}–${curto(Math.round(res.p75))})</small>`
+      : res?.grupo ? '<small>sem venda parecida para comparar</small>' : '<small>nenhuma venda em 30 dias nesta moeda</small>';
+    const dif = res?.delta != null ? ` · <b class="${res.delta <= 0 ? 'oc-pos' : 'oc-neg'}">${res.delta >= 0 ? '+' : '−'}${Math.round(Math.abs(res.delta) * 100)}%</b>` : '';
+    const ver = res?.veredito ? ` <span class="oc-tag ${tagVer[res.veredito]}">${res.veredito}</span>${res.confianca !== 'boa' ? ` <small>confiança ${res.confianca}</small>` : ''}` : '';
+    return `<div class="oc-pc-card ${res?.veredito === 'barato' ? 'oc-pc-barato' : ''} ${aberto ? 'oc-pc-aberto' : ''}">
+      <div class="oc-pc-topo" data-pc-abrir="${esc(chave)}" role="button" tabindex="0" title="${aberto ? 'fechar' : 'ver as vendas parecidas'}">
+        <div class="oc-pc-l1"><span><b>${esc(a.nome)}</b> nv ${num(a.lv)} ${etiquetas(a)}</span><b class="oc-pc-preco">${precoTxt(preco, l.moeda)}</b></div>
+        <div class="oc-pc-l2">P${a.p} · nota ${dec(a.n, 2)} · IV ${num(a.iv)} · Q ${dec(a.q, 3)}${retido}</div>
+        <div class="oc-pc-l3">${justo}${dif}${ver}</div>
+        ${melhor ? `<div class="oc-pc-l3 oc-neg">tem igual ou melhor por ${precoTxt(Number(melhor.preco), melhor.moeda)}</div>` : ''}
+      </div>
+      ${aberto ? `<div class="oc-pc-det">${blocoVizinhos(res, a)}${blocoParaMim(chave)}</div>` : ''}
+    </div>`;
+  }
+
+  /** Filtros + os anúncios avaliados (o mesmo conteúdo na aba e na gaveta). */
+  function listaPreco() {
     if (!OC.preco || !OC.mercado) return '<div class="oc-aviso">O módulo do Mercado não carregou. Recarregue a página.</div>';
-    const v = OC.preco.vitrine();
-    let corpo;
-    if (!v) corpo = '<div class="oc-caixa">Abra o Mercado do jogo na aba <b>Pokemon</b> e clique numa espécie. A extensão lê os anúncios que aparecerem e compara cada um com as vendas reais dos últimos 30 dias, já ajustando pela nota, potência, nível e TM. Os resultados aparecem aqui.</div>';
-    else {
-      const agoraS = OC.agoraServidor?.() ?? Date.now();
-      const rows = v.linhas.map((l) => {
-        const a = OC.preco.resumir(l.ficha), preco = Number(l.preco);
-        return { l, a, preco, res: OC.preco.avaliar({ ...a, moeda: l.moeda, preco }), melhor: OC.preco.melhorPorMenos(l, v.linhas) };
-      }).sort((x, y) => (x.res?.delta ?? 9) - (y.res?.delta ?? 9));
-      const nomes = [...new Set(rows.map((r) => `${r.a.nome}${r.a.sh ? ' shiny' : ''}`))].join(', ');
-      const trs = rows.map(({ l, a, preco, res, melhor }) => {
-        const chave = `v${l.id}`, aberto = pc.aberto === chave;
-        const retido = Number(l.compravelEm) > agoraS ? `<small>retido mais ${Math.ceil((Number(l.compravelEm) - agoraS) / 1000)} s</small>` : '';
-        const justo = res?.estimado ? `${precoTxt(res.estimado, l.moeda)}<small>normal: ${curto(Math.round(res.p25))}–${curto(Math.round(res.p75))}</small>` : res?.grupo ? '<small>sem venda parecida</small>' : '<small>nenhuma venda em 30 dias</small>';
-        const dif = res?.delta != null ? `<b class="${res.delta <= 0 ? 'oc-pos' : 'oc-neg'}">${res.delta >= 0 ? '+' : '−'}${Math.round(Math.abs(res.delta) * 100)}%</b>` : '—';
-        const ver = res?.veredito ? `<span class="oc-tag ${tagVer[res.veredito]}">${res.veredito}</span>${res.confianca !== 'boa' ? `<small>confiança ${res.confianca}</small>` : ''}` : '—';
-        const dom = melhor ? `<small class="oc-neg">tem igual ou melhor por ${precoTxt(Number(melhor.preco), melhor.moeda)}</small>` : '';
-        return `<tr class="${aberto ? 'oc-campo' : ''}"><td><b>${esc(a.nome)}</b> nv ${num(a.lv)}<small>P${a.p} · N ${dec(a.n, 2)} · IV ${num(a.iv)} · Q ${dec(a.q, 3)} ${etiquetas(a)}</small></td>
-          <td>${precoTxt(preco, l.moeda)}${retido}</td><td>${justo}</td><td>${dif}</td><td>${ver}${dom}</td>
-          <td><button type="button" class="oc-link" data-pc-abrir="${esc(chave)}">${aberto ? 'fechar' : 'ver vendas'}</button></td></tr>
-          ${aberto ? `<tr><td colspan="6">${blocoVizinhos(res, a)}${blocoParaMim(chave)}</td></tr>` : ''}`;
-      }).join('');
-      corpo = `<div class="oc-ctrl"><span><b>${esc(nomes)}</b>: ${rows.length} anúncio${rows.length > 1 ? 's' : ''} que você abriu no jogo ${ha(v.t)}</span>
-          <button type="button" class="oc-link" data-acao="pc-reler" ${pc.lendo ? 'disabled' : ''}>reler as vendas</button>
-          ${pc.status ? `<span class="oc-nota">${esc(pc.status)}</span>` : ''}</div>
-        ${pc.erro ? `<div class="oc-aviso">Não consegui ler as vendas: ${esc(pc.erro)}</div>` : ''}
-        <div class="oc-tabela"><table><thead><tr><th>Anúncio</th><th>Preço</th><th>Preço justo</th><th>Diferença</th><th>Veredito</th><th></th></tr></thead><tbody>${trs}</tbody></table></div>`;
-    }
+    const r = anunciosAvaliados();
+    if (!r) return '<div class="oc-caixa">No Mercado do jogo, abra a aba <b>Pokemon</b> e clique numa espécie. Os anúncios dela aparecem aqui, cada um comparado com as vendas reais dos últimos 30 dias, já ajustado pela nota, potência, nível e TM.</div>';
+    const nomes = [...new Set(r.todos.map((x) => `${x.a.nome}${x.a.sh ? ' shiny' : ''}`))].join(', ');
+    const agoraS = OC.agoraServidor?.() ?? Date.now();
+    return `${filtrosPreco(r.todos)}
+      <div class="oc-ctrl"><span><b>${esc(nomes)}</b>: ${r.lista.length === r.todos.length ? `${r.todos.length} anúncio${r.todos.length > 1 ? 's' : ''}` : `${r.lista.length} de ${r.todos.length} anúncios`}${r.baratos ? ` · <b class="oc-pos">${r.baratos} barato${r.baratos > 1 ? 's' : ''}</b>` : ''} · aberto ${ha(r.v.t)}</span>
+        <button type="button" class="oc-link" data-acao="pc-reler" ${pc.lendo ? 'disabled' : ''}>reler as vendas</button></div>
+      ${pc.status ? `<div class="oc-nota">${esc(pc.status)}</div>` : ''}
+      ${pc.erro ? `<div class="oc-aviso">Não consegui ler as vendas: ${esc(pc.erro)}</div>` : ''}
+      <div class="oc-pc-lista">${r.lista.map((x) => cartaoAnuncio(x, agoraS)).join('') || '<div class="oc-caixa">Nenhum anúncio passa nos filtros.</div>'}</div>`;
+  }
+
+  function abaPreco() {
     const m = pc.manual, opt = (val, r, at) => `<option value="${val}" ${String(at) === String(val) ? 'selected' : ''}>${r}</option>`;
     const nomesEsp = jogo ? [...jogo.especies.values()].map((e) => e.name).filter(Boolean).sort() : [];
     let manual = '';
@@ -863,7 +920,8 @@
           <span class="oc-onde">faixa normal ${precoTxt(res.p25, alvo.moeda)} a ${precoTxt(res.p75, alvo.moeda)}${res.veredito ? ` · pedindo ${precoTxt(alvo.preco, alvo.moeda)}: <span class="oc-tag ${tagVer[res.veredito]}">${res.veredito}</span> (${res.delta >= 0 ? '+' : '−'}${Math.round(Math.abs(res.delta) * 100)}%)` : ''}</span></div>
           ${blocoVizinhos(res, alvo)}`;
     }
-    return `${corpo}
+    return `<div class="oc-ctrl"><label class="oc-chk"><input type="checkbox" data-pref="pcGaveta" ${prefs.pcGaveta === false ? '' : 'checked'}> Mostrar a gaveta de preço ao lado do Mercado do jogo</label></div>
+      ${listaPreco()}
       <h4 class="oc-sub">Avaliar um pokémon específico</h4>
       <div class="oc-form">
         <label>Espécie<input type="text" class="oc-txt" data-pc="nome" list="oc-pc-nomes" value="${esc(m.nome)}" placeholder="Charizard, Mega Charizard Y…"></label>
@@ -874,13 +932,95 @@
         <label>Refino total<input type="number" class="oc-num" min="0" data-pc="rf" value="${esc(m.rf)}"></label>
         <label>Moeda<select data-pc="moeda">${opt('orb', 'Gemas', m.moeda)}${opt('gold', 'Coins', m.moeda)}</select></label>
         <label>Preço pedido <small>(opcional)</small>${campoDin('data-pc="preco"', m.preco, 'opcional')}</label>
-        <label><input type="checkbox" data-pc="shiny" ${m.shiny ? 'checked' : ''}> Shiny</label>
-        <label><input type="checkbox" data-pc="aoe" ${m.aoe ? 'checked' : ''}> TM AoE</label>
-        <label><input type="checkbox" data-pc="el" ${m.el ? 'checked' : ''}> TM elemental</label>
+        <label class="oc-chk"><input type="checkbox" data-pc="shiny" ${m.shiny ? 'checked' : ''}> Shiny</label>
+        <label class="oc-chk"><input type="checkbox" data-pc="aoe" ${m.aoe ? 'checked' : ''}> TM AoE</label>
+        <label class="oc-chk"><input type="checkbox" data-pc="el" ${m.el ? 'checked' : ''}> TM elemental</label>
       </div>
       <div class="oc-ctrl"><button type="button" class="oc-btn" data-acao="pc-avaliar" ${pc.lendo ? 'disabled' : ''}>Avaliar</button></div>
       ${manual}
-      <p class="oc-nota">Compara só com vendas da mesma espécie, na mesma moeda, com o mesmo brilho (e P5 só com P5), dos últimos 30 dias. As vendas mais recentes e mais parecidas em potência, nível, TM AoE, TM elemental e refino pesam mais, e cada uma é ajustada para a nota do anúncio. Uma venda isolada a preço absurdo não arrasta a conta: o preço justo é a mediana. ${num(OC.preco.total())} vendas guardadas neste navegador, lidas da Tabela de preços do jogo (um pedido a cada 3 s, só quando você abre uma espécie ou clica em Avaliar). <button type="button" class="oc-link" data-acao="pc-esquecer">esquecer as vendas guardadas</button></p>`;
+      <p class="oc-nota">Compara só com vendas da mesma espécie, na mesma moeda, com o mesmo brilho (e P5 só com P5), dos últimos 30 dias. As vendas mais recentes e mais parecidas em potência, nível, TM AoE, TM elemental e refino pesam mais, e cada uma é ajustada para a nota do anúncio. Uma venda isolada a preço absurdo não arrasta a conta: o preço justo é a mediana. ${num(OC.preco?.total() ?? 0)} vendas guardadas neste navegador, lidas da Tabela de preços do jogo (um pedido a cada 3 s, só quando você abre uma espécie ou clica em Avaliar). <button type="button" class="oc-link" data-acao="pc-esquecer">esquecer as vendas guardadas</button></p>`;
+  }
+
+  // ---- a gaveta ao lado do Mercado do jogo ----------------------------------------------------
+  /** Cliques dentro da extensão não chegam ao jogo: senão o jogo entende "clicou fora" e fecha o Mercado. */
+  const naExtensao = (t) => !!t?.closest?.('.oc-painel, .oc-pilula');
+  for (const tipo of ['mousedown', 'pointerdown', 'touchstart']) root.addEventListener(tipo, (e) => { if (naExtensao(e.target)) e.stopImmediatePropagation(); }, true);
+  const isolar = (el) => { for (const tipo of ['click', 'mouseup', 'pointerup', 'touchend', 'keydown']) el.addEventListener(tipo, (e) => { if (e.key !== 'Escape') e.stopPropagation(); }); return el; };
+
+  function desenharGaveta(forcar = false) {
+    if (!gaveta) return;
+    if (!forcar && gaveta.querySelector('input:focus')) return;
+    const sc = gaveta.querySelector('.oc-gv-corpo')?.scrollTop ?? 0;
+    gaveta.className = `oc-painel oc-gaveta${prefs.pcLado === 'esq' ? ' oc-esq' : ''}`;
+    gaveta.innerHTML = `<div class="oc-cab"><div class="oc-titulo"><h3>Preço justo</h3><small>vendas reais dos últimos 30 dias</small></div>
+        <button type="button" class="oc-fechar" data-gv="lado" title="Mudar de lado" aria-label="Mudar de lado">⇆</button>
+        <button type="button" class="oc-fechar" data-gv="recolher" title="Recolher" aria-label="Recolher">–</button></div>
+      <div class="oc-gv-corpo">${listaPreco()}</div>`;
+    gaveta.querySelector('.oc-gv-corpo').scrollTop = sc;
+    ligarPreco(gaveta);
+    gaveta.querySelector('[data-gv="lado"]').addEventListener('click', () => { prefs.pcLado = prefs.pcLado === 'esq' ? 'dir' : 'esq'; salvarPrefs(); desenharGaveta(true); });
+    gaveta.querySelector('[data-gv="recolher"]').addEventListener('click', () => { prefs.pcGavetaRecolhida = true; salvarPrefs(); controlarGaveta(); });
+  }
+  function atualizarPilula() {
+    if (!pilula) return;
+    const r = anunciosAvaliados();
+    pilula.className = `oc-pilula${prefs.pcLado === 'esq' ? ' oc-esq' : ''}`;
+    pilula.innerHTML = `💰 Preço justo${r?.baratos ? ` <b>${r.baratos}</b>` : ''}`;
+    pilula.title = r ? `${r.todos.length} anúncios avaliados${r.baratos ? `, ${r.baratos} baratos` : ''}` : 'Abra uma espécie no Mercado';
+  }
+  /** Mostra a gaveta (ou a abinha recolhida) enquanto o Mercado do jogo estiver na tela. */
+  function controlarGaveta() {
+    if (!document.body) return;
+    const naTela = prefs.pcGaveta !== false && !!OC.mercado?.naTela?.();
+    if (!naTela) { gaveta?.remove(); gaveta = null; pilula?.remove(); pilula = null; return; }
+    if (!prefs.pcGavetaRecolhida) {
+      pilula?.remove(); pilula = null;
+      if (!gaveta) { gaveta = isolar(document.createElement('div')); gaveta.setAttribute('role', 'complementary'); gaveta.setAttribute('aria-label', 'Preço justo'); document.body.append(gaveta); desenharGaveta(true); lerVitrine(); }
+    } else {
+      gaveta?.remove(); gaveta = null;
+      if (!pilula) {
+        pilula = isolar(document.createElement('button')); pilula.type = 'button';
+        pilula.addEventListener('click', () => { prefs.pcGavetaRecolhida = false; salvarPrefs(); controlarGaveta(); });
+        document.body.append(pilula); atualizarPilula();
+      }
+    }
+  }
+  setInterval(controlarGaveta, 700);
+
+  /** Os controles do preço, no painel ou na gaveta. */
+  function ligarPreco(raiz) {
+    for (const b of raiz.querySelectorAll('[data-pcf-moeda]')) b.addEventListener('click', () => { pcF().moeda = b.dataset.pcfMoeda; salvarPrefs(); redesenharPreco(true); });
+    for (const el of raiz.querySelectorAll('[data-pcf]')) el.addEventListener('change', () => {
+      pcF()[el.dataset.pcf] = el.type === 'checkbox' ? el.checked : el.value; salvarPrefs(); redesenharPreco(true);
+    });
+    raiz.querySelector('[data-pcf-limpar]')?.addEventListener('click', () => { prefs.pcFiltro = { ...pcFiltroPadrao }; salvarPrefs(); redesenharPreco(true); });
+    for (const t of raiz.querySelectorAll('[data-pc-abrir]')) {
+      const abrir = () => { pc.aberto = pc.aberto === t.dataset.pcAbrir ? null : t.dataset.pcAbrir; redesenharPreco(true); };
+      t.addEventListener('click', abrir);
+      t.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); abrir(); } });
+    }
+    for (const b of raiz.querySelectorAll('[data-pc-mim]')) b.addEventListener('click', async () => {
+      const chave = b.dataset.pcMim, l = OC.preco.vitrine()?.linhas.find((x) => `v${x.id}` === chave);
+      if (!l) return;
+      b.disabled = true; b.textContent = 'calculando…';
+      await calcularParaMim(chave, l.ficha, Number(l.preco), l.moeda); redesenharPreco(true);
+    });
+    raiz.querySelector('[data-acao="pc-reler"]')?.addEventListener('click', () => lerVitrine(true));
+    // só no painel
+    for (const el of raiz.querySelectorAll('[data-pc]')) el.addEventListener(el.type === 'checkbox' || el.tagName === 'SELECT' ? 'change' : 'input', () => { pc.manual[el.dataset.pc] = el.type === 'checkbox' ? el.checked : el.value; });
+    raiz.querySelector('[data-acao="pc-esquecer"]')?.addEventListener('click', () => { OC.preco.esquecer(); pc.manualRes = null; pc.lidoVitrine = 0; redesenharPreco(true); });
+    raiz.querySelector('[data-acao="pc-avaliar"]')?.addEventListener('click', async () => {
+      const m = pc.manual;
+      jogo ??= await OC.carregarJogo().catch(() => null);
+      const esp = [...(jogo?.especies.values() ?? [])].find((e) => String(e.name).toLowerCase() === m.nome.trim().toLowerCase() || String(e.pokeId) === m.nome.trim().replace('#', ''));
+      if (!esp) { pc.manualRes = { erro: `Não achei a espécie "${m.nome}". Escolha um nome da lista.` }; return redesenharPreco(true); }
+      if (!(Number(String(m.nota).replace(',', '.')) > 0)) { pc.manualRes = { erro: 'Diga a nota (a N= da ficha).' }; return redesenharPreco(true); }
+      const alvo = { sp: Number(esp.pokeId), nome: esp.name, sh: !!m.shiny, p: Number(m.pot) || 1, n: Number(String(m.nota).replace(',', '.')), lv: Number(m.nivel) || 100, aoe: !!m.aoe, el: m.el ? 'sim' : null, rf: Number(m.rf) || 0, moeda: m.moeda, preco: parseValor(m.preco) || 0 };
+      pc.lendo = true; pc.status = `lendo as vendas de ${esp.name}…`; redesenharPreco(true);
+      try { await OC.preco.ler(alvo.sp, alvo.nome, alvo.sh); pc.manualRes = { alvo, res: OC.preco.avaliar(alvo) }; }
+      catch (e) { pc.manualRes = { erro: `Não consegui ler as vendas: ${e?.message ?? e}` }; }
+      pc.lendo = false; pc.status = ''; redesenharPreco(true);
+    });
   }
 
   function abaAlvo() {
@@ -981,29 +1121,7 @@
         .then(async (ok) => { if (ok) { prefs.pkUpar = null; salvarPrefs(); } await recalcular(true); desenhar(); });
       desenhar();
     });
-    // ---- Preço justo
-    for (const el of painel.querySelectorAll('[data-pc]')) el.addEventListener(el.type === 'checkbox' || el.tagName === 'SELECT' ? 'change' : 'input', () => { pc.manual[el.dataset.pc] = el.type === 'checkbox' ? el.checked : el.value; });
-    for (const b of painel.querySelectorAll('[data-pc-abrir]')) b.addEventListener('click', () => { pc.aberto = pc.aberto === b.dataset.pcAbrir ? null : b.dataset.pcAbrir; desenhar(); });
-    for (const b of painel.querySelectorAll('[data-pc-mim]')) b.addEventListener('click', async () => {
-      const chave = b.dataset.pcMim, l = OC.preco.vitrine()?.linhas.find((x) => `v${x.id}` === chave);
-      if (!l) return;
-      b.disabled = true; b.textContent = 'calculando…';
-      await calcularParaMim(chave, l.ficha, Number(l.preco), l.moeda); desenhar();
-    });
-    painel.querySelector('[data-acao="pc-reler"]')?.addEventListener('click', () => lerVitrine(true));
-    painel.querySelector('[data-acao="pc-esquecer"]')?.addEventListener('click', () => { OC.preco.esquecer(); pc.manualRes = null; pc.lidoVitrine = 0; desenhar(); });
-    painel.querySelector('[data-acao="pc-avaliar"]')?.addEventListener('click', async () => {
-      const m = pc.manual;
-      jogo ??= await OC.carregarJogo().catch(() => null);
-      const esp = [...(jogo?.especies.values() ?? [])].find((e) => String(e.name).toLowerCase() === m.nome.trim().toLowerCase() || String(e.pokeId) === m.nome.trim().replace('#', ''));
-      if (!esp) { pc.manualRes = { erro: `Não achei a espécie "${m.nome}". Escolha um nome da lista.` }; return desenhar(); }
-      if (!(Number(m.nota) > 0)) { pc.manualRes = { erro: 'Diga a nota (a N= da ficha).' }; return desenhar(); }
-      const alvo = { sp: Number(esp.pokeId), nome: esp.name, sh: !!m.shiny, p: Number(m.pot) || 1, n: Number(m.nota), lv: Number(m.nivel) || 100, aoe: !!m.aoe, el: m.el ? 'sim' : null, rf: Number(m.rf) || 0, moeda: m.moeda, preco: parseValor(m.preco) || 0 };
-      pc.lendo = true; pc.status = `lendo as vendas de ${esp.name}…`; desenhar();
-      try { await OC.preco.ler(alvo.sp, alvo.nome, alvo.sh); pc.manualRes = { alvo, res: OC.preco.avaliar(alvo) }; }
-      catch (e) { pc.manualRes = { erro: `Não consegui ler as vendas: ${e?.message ?? e}` }; }
-      pc.lendo = false; pc.status = ''; desenhar();
-    });
+    ligarPreco(painel);
     // ---- Mercado
     for (const el of painel.querySelectorAll('[data-mk]')) {
       const k = el.dataset.mk, tipoEv = el.type === 'checkbox' || el.tagName === 'SELECT' ? 'change' : 'input';
@@ -1116,7 +1234,8 @@
   OC.on('aviso', () => { if (painel && prefs.aba === 'ajustes' && !painel.querySelector('input:focus, select:focus, textarea:focus')) desenhar(); });
   OC.on('mercado', () => { if (painel && prefs.aba === 'mercado' && !painel.querySelector('input:focus, select:focus')) desenhar(); });
   // anúncios novos na tela do jogo: com a aba Preço aberta, lê as vendas da espécie e redesenha
-  OC.on('preco', () => { if (painel && prefs.aba === 'preco') { pc.aberto = null; if (!painel.querySelector('input:focus, select:focus')) desenhar(); lerVitrine(); } });
+  // anúncios novos na tela do jogo: lê as vendas da espécie e atualiza a gaveta e a aba Preço
+  OC.on('preco', () => { pc.aberto = null; redesenharPreco(); if (gaveta || pilula || (painel && prefs.aba === 'preco')) lerVitrine(); });
   OC.on('auto', () => { if (painel && (prefs.aba === 'setup' || prefs.aba === 'ajustes' || prefs.aba === 'hunts') && !painel.querySelector('input:focus, select:focus')) desenhar(); });
   OC.ui = { abrir, fechar, desenhar, prefs, salvarPrefs, analiseFresca: async () => { await recalcular(false); return analise; },
     interno: () => ({ welcome, eu, jogo, itens, analise, xpDoTreinador: eu ? xpDoTreinador() : null, ritmo: eu ? ritmoTreinador() : null }) };
