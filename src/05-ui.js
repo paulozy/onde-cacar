@@ -12,7 +12,7 @@
     pocao: 'auto', bola: 'auto', vender: true, bike: 0, precoBeast: 100, hpMinimo: 0.35, horas: 4, sel: null,
     autoRepor: false, autoTrocar: false, autoMinHoras: 1, autoReserva: 1000000, autoTetoHora: 3000000,
     mercadoLigado: false, mercadoLimiteGold: 50000000, mercadoGemas: false, mercadoLimiteOrb: 0, precoOutlandDoMercado: true,
-    precoDiamante: 7, alvoAtrasados: 943, ginasios: [], contarLive: false, avisoSom: false, avisoPotMin: 3, avisoQualMin: 1.5, avisoIvMin: 150,
+    ginasios: [], contarLive: false, avisoSom: false, avisoPotMin: 3, avisoQualMin: 1.5, avisoIvMin: 150,
     ...lerJ(CHAVE_PREFS, {}),
   };
   if (prefs.aba === 'comprar') prefs.aba = 'alvo'; // a aba Comprar saiu na 2.1
@@ -418,12 +418,10 @@
       ${OC.avisos?.historico().length ? `<div class="oc-caixa">${OC.avisos.historico().slice(0, 8).map((a) => `<div>${new Date(a.t).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} <b>${esc(a.titulo)}</b> ${esc(a.texto)}</div>`).join('')}</div>` : ''}
       <h4 class="oc-sub">Valores de referência</h4>
       <div class="oc-form">
-      <label>Quanto vale 1 💎 para você (Gemas) <small>· o Mercado não negocia mais diamante: use o que você paga na Loja (1 Gema = US$ 0,01)</small><input type="number" class="oc-num" min="1" step="0.5" value="${prefs.precoDiamante}" data-pref-num="precoDiamante"></label>
       <label>Bronze Boss Token no Mercado (Coins)${campoDin('data-pref-num="precoToken"', prefs.precoToken)}</label>
       <label>Fragmento de Chave (Coins)${campoDin('data-pref-num="precoFragChave"', prefs.precoFragChave)}</label>
       <label>Fragmento de Shiny Stone (Coins)${campoDin('data-pref-num="precoFragShiny"', prefs.precoFragShiny)}</label>
       <label>Fragmento de Bicicleta (Coins)${campoDin('data-pref-num="precoFragBike"', prefs.precoFragBike)}</label>
-      <label>Alvo do Boost dos Atrasados (se o jogo não informar)<input type="number" class="oc-num" min="1" value="${prefs.alvoAtrasados}" data-pref-num="alvoAtrasados"></label>
       </div>
       <h4 class="oc-sub">Automação (desligada até você ligar)</h4>
       <div class="oc-form">
@@ -480,7 +478,6 @@
     return (analise?.bonus?.itens ?? []).filter((i) => i.quem !== 'pk').map((i) => {
       let ate = venc[i.nome];
       if (i.nome === 'Twitch') ate = prefs.contarLive ? Infinity : agora; // só enquanto você assiste
-      else if (i.nome === 'Atrasados') ate = Infinity;                     // tratado à parte
       else if (!Number.isFinite(ate) || !ate) ate = Infinity;              // guild e outros: sem data
       return { ...i, horas: ate === Infinity ? Infinity : Math.max(0, (ate - agora) / 3.6e6) };
     });
@@ -504,45 +501,25 @@
   function abaProgresso() {
     if (!eu) return '';
     const L = eu.level ?? 1, xp = xpDoTreinador(), r = ritmoTreinador();
-    const at = eu.loja?.atrasados;
-    const alvoJogo = Number(eu.loja?.alvoAtrasados) || Number(at?.alvo) || 0;
-    const alvo = alvoJogo || Number(prefs.alvoAtrasados) || 870;
-    const ativo = Number(at?.mult) > 1 && L < alvo;
-    const mostraBoost = !ativo && L < alvo; // passou do alvo: o boost não existe para você
     const marcos = [[L + 1, 'próximo nível'], [150, 'Outland, Ginásio e PvP Ranqueado'], [300, 'bosses Regirock e Regice (Mega Stone, peças de TM)'],
-      [500, 'Hoenn e Orre (Z-Move e AoE fazem falta)'], [650, 'bosses Registeel e Kyogre'], [alvo, 'nível dos veteranos (fim do Boost dos Atrasados)'], [1000, 'Sinnoh e Outland 2 (token 25% mais rápido)'],
+      [500, 'Hoenn e Orre (Z-Move e AoE fazem falta)'], [650, 'bosses Registeel e Kyogre'], [1000, 'Sinnoh e Outland 2 (token 25% mais rápido)'],
       [2000, 'Outland 3'], [3100, 'bosses Groudon e Rayquaza (1,5% de peça e de Mega)'], [4000, 'Outland 4 (token ×2)'],
       [5000, 'Unova (fragmento de Ovo Shiny)'], [8000, 'Outland 5'], [9750, 'bosses Uxie e Mesprit'], [10000, 'Kalos'],
       [16000, 'Outland 6'], [22700, 'bosses Azelf e Dialga'], [25000, 'Alola'], [40000, 'Galar'], [75000, 'Paldea']];
     const johto = [200, 230, 260, 290, 320, 350, 380, 410, 440, 470].find((t) => t > L);
     if (johto) marcos.push([johto, `próxima faixa de Johto (nv ${johto})`]);
-    const lista = marcos.filter(([n]) => n > L && !(n === alvo && L >= alvo)).sort((a, b) => a[0] - b[0]).filter((m, i, a) => i === 0 || m[0] !== a[i - 1][0]).slice(0, 7);
+    const lista = marcos.filter(([n]) => n > L).sort((a, b) => a[0] - b[0]).filter((m, i, a) => i === 0 || m[0] !== a[i - 1][0]).slice(0, 7);
     const bt = r ? boostsDoTreinador() : [];
     const tempoAte = (n) => (r ? horasCom(Math.max(0, xpTotal(n) - xp), r.v, bt) : NaN);
-    const comBoost = (n) => {
-      if (!r) return NaN;
-      const xa = xpTotal(alvo), xn = xpTotal(n);
-      const comDez = Math.max(0, Math.min(xn, xa) - xp);   // até o alvo, ×10
-      const semDez = Math.max(0, xn - Math.max(xa, xp));   // depois do alvo, ×1
-      const t1 = horasCom(comDez, r.v, bt, 10);
-      const bt2 = bt.map((b) => ({ ...b, horas: Math.max(0, b.horas - t1) }));
-      return t1 + horasCom(semDez, r.v, bt2);
-    };
-    const linhas = lista.map(([n, nome]) => `<tr><td><b>${num(n)}</b><small>${esc(nome)}</small></td><td>${curto(Math.max(0, xpTotal(n) - xp))}</td><td>${r ? tempo(tempoAte(n)) : '—'}</td>${mostraBoost ? `<td>${r ? tempo(comBoost(n)) : '—'}</td>` : ''}</tr>`).join('');
-    const xpAlvo = xpTotal(alvo);
-    const preco = Math.max(50, Math.ceil(1000 * Math.max(0, xpAlvo - xp) / xpAlvo));
-    const gemas = preco * (Number(prefs.precoDiamante) || 7);
+    const linhas = lista.map(([n, nome]) => `<tr><td><b>${num(n)}</b><small>${esc(nome)}</small></td><td>${curto(Math.max(0, xpTotal(n) - xp))}</td><td>${r ? tempo(tempoAte(n)) : '—'}</td></tr>`).join('');
     const pk = pkAtivo();
     return `<div class="oc-linha">Treinador nv <b>${num(L)}</b> com ${curto(xp)} de XP. Ritmo: <b>${r ? `${curto(r.v)}/h` : '—'}</b>${r ? ` <small>(${esc(r.fonte)})</small>` : ''}.${pk ? ` Seu pokémon pode chegar até o nv ${num(L + 5)}.` : ''}</div>
       ${bt.length ? `<div class="oc-linha">Bônus no ritmo: ${bt.map((b) => `${esc(b.nome)} ×${dec(b.mult, 2)}${b.nome === 'Twitch' ? (prefs.contarLive ? ' (contando a live)' : ' (fora dos tempos: só vale enquanto você assiste)') : Number.isFinite(b.horas) ? ` (acaba em ${tempo(b.horas)})` : ''}`).join(', ')}.
         <label class="oc-chk" style="margin-left:8px"><input type="checkbox" data-pref="contarLive" ${prefs.contarLive ? 'checked' : ''}> contar a live nos tempos</label></div>` : ''}
-      <div class="oc-tabela"><table><thead><tr><th>Nível</th><th>XP que falta</th><th>No ritmo atual</th>${mostraBoost ? '<th>Com Atrasados ×10</th>' : ''}</tr></thead><tbody>${linhas}</tbody></table></div>
-      <div class="oc-caixa" style="margin-top:8px">${ativo
-        ? `<b>Boost dos Atrasados ativo</b>: XP ×10 até o nv ${num(alvo)}. O ritmo acima já conta com ele.`
-        : L >= alvo ? 'Você já passou do nível dos veteranos: o Boost dos Atrasados não se aplica.'
-        : `<b>Boost dos Atrasados</b> até o nv ${num(alvo)}: ~<b>${num(preco)} 💎</b>${preco === 50 ? ' (o preço mínimo)' : ''} no seu nível (pela fórmula da Wiki; o card da Loja mostra o valor exato), ~${num(gemas)} Gemas (~US$ ${dec(gemas / 100, 2)}) contando o diamante a ${num(prefs.precoDiamante)} Gemas (o valor dos Ajustes).`}</div>
-      <p class="oc-nota">Cada boost conta só até vencer. Conforme você sobe, abrem hunts melhores e o ritmo cresce, então os tempos longos tendem a ser menores. O alvo do Atrasados é recalculado todo dia pelo jogo (${alvoJogo ? `hoje: nv ${num(alvo)}, mediana de ${num(Number(eu.loja?.alvoAtrasadosN) || 0)} veteranos, lido do jogo` : `usando ${num(alvo)}; ajuste em Ajustes`}).</p>`;
+      <div class="oc-tabela"><table><thead><tr><th>Nível</th><th>XP que falta</th><th>No ritmo atual</th></tr></thead><tbody>${linhas}</tbody></table></div>
+      <p class="oc-nota">Cada boost conta só até vencer. Conforme você sobe, abrem hunts melhores e o ritmo cresce, então os tempos longos tendem a ser menores.</p>`;
   }
+
 
   // ---- Capturar: onde e em quanto tempo sai um pokémon específico ---------------------------
   let alvoTxt = '';
@@ -984,7 +961,7 @@
       <span class="oc-vd-acoes">${podeAnunciar ? `<button type="button" class="oc-link oc-vd-anunciar" data-vd-anunciar="${o[k]}" data-vd-moeda="${M}" data-vd-pk="${esc(r.pid)}">anunciar</button>` : ''}<button type="button" class="oc-link" data-vd-copiar="${o[k]}">copiar</button></span></div>`;
     const base = m.est ? `Pelas vendas: justo ${precoTxt(m.est, M)}, faixa normal ${precoTxt(m.res.p25, M)} a ${precoTxt(m.res.p75, M)} (confiança ${m.res.confianca}, ${num(m.res.grupo)} vendas da espécie).`
       : 'Sem venda parecida: as sugestões saem só dos anúncios abertos.';
-    return `<div class="oc-vd-moeda"><h5>Em ${nomeM} <small>comissão de ${Math.round(m.comissao * 100)}%</small></h5>
+    return `<div class="oc-vd-moeda"><h5>Em ${nomeM} <small>comissão de ${dec(m.comissao * 100, 1)}%${M === 'orb' ? ' (por faixa)' : ''} · pensão de 100 mil Coins por dia</small></h5>
       <div class="oc-vd-ops">${col('rapido', 'Vender rápido')}${col('justo', 'Preço justo')}${col('paciente', 'Sem pressa')}</div>
       <p class="oc-nota">${base} ${esc(concTxt)}${m.pctNota != null ? ` A nota dele é maior que a de ${m.pctNota}% dos vendidos em ${nomeM}.` : ''}</p></div>`;
   }
@@ -992,21 +969,26 @@
   function caixaConfirmar(res) {
     const c = vd.confirmar, r = res.r, M = c.moeda, nomeM = M === 'orb' ? 'Gemas' : 'Coins';
     const v = parseValor(c.preco), m = res.porMoeda?.find((x) => x.moeda === M);
-    const dias = OC.mercado?.diasDoJogo?.() ?? 1;
+    const dias = Math.min(30, Math.max(1, Math.floor(Number(c.dias) || OC.mercado?.diasDoJogo?.() || 1)));
+    const pensao = dias * OC.venda.PENSAO_DIA, ouro = Number(eu?.gold) || 0;
     const avisos = [];
     if (!(v > 0)) avisos.push('Digite um preço válido.');
     else {
       if (m?.teto && v >= m.teto) avisos.push(`Tem anúncio igual ou melhor que o seu por ${precoTxt(m.teto, M)}: acima disso, quem compra leva o outro.`);
       if (m?.est && v < m.est * 0.8) avisos.push(`Está ${Math.round((1 - v / m.est) * 100)}% abaixo do preço justo (${precoTxt(m.est, M)}).`);
     }
-    const liq = v > 0 ? Math.floor(v * (1 - OC.venda.COMISSAO[M])) : 0;
+    if (ouro < pensao) avisos.push(`A pensão de ${precoTxt(pensao, 'gold')} é paga agora e você tem ${precoTxt(ouro, 'gold')}.`);
+    const liq = v > 0 ? OC.venda.liquidoDe(M, v) : 0;
+    const pct = v > 0 ? OC.venda.pctComissao(M, v) : 0;
+    const sobra = M === 'gold' && v > 0 ? ` Descontada a pensão, sobram ${precoTxt(liq - pensao, 'gold')}.` : '';
     return `<div class="oc-vd-conf">
       <b>Anunciar ${esc(r.apelido || r.nome)} nv ${num(r.lv)} no Mercado?</b>
       <label>Preço em ${nomeM}${campoDin('data-vd-conf-preco', c.preco)}</label>
-      <p class="oc-nota">O anúncio dura ${dias} dia${dias > 1 ? 's' : ''}, como o seu último anúncio feito pelo jogo.${v > 0 ? ` Se vender, você recebe ${precoTxt(liq, M)} depois da comissão de ${Math.round(OC.venda.COMISSAO[M] * 100)}%${M === 'orb' ? ` (≈ US$ ${dec(liq * OC.venda.USD_POR_GEMA, 2)})` : ''}.` : ''}</p>
+      <label>Dias na feira (1 a 30)<input type="number" class="oc-num" min="1" max="30" step="1" data-vd-conf-dias value="${dias}"></label>
+      <p class="oc-nota">Pensão: ${dias} dia${dias > 1 ? 's' : ''} × 100.000 = ${precoTxt(pensao, 'gold')}, pagos agora. Se vender antes, os dias pagos não voltam; se ninguém comprar, ele volta ao Depot no fim do prazo.${v > 0 ? ` Se vender, você recebe ${precoTxt(liq, M)} depois da comissão (${dec(pct * 100, 1)}%${M === 'orb' ? ', por faixa' : ''})${M === 'orb' ? `, ≈ US$ ${dec(liq * OC.venda.USD_POR_GEMA, 2)} no saque` : ''}.${sobra}` : ''}</p>
       ${avisos.map((a) => `<div class="oc-aviso">${esc(a)}</div>`).join('')}
       ${vd.erroAnuncio ? `<div class="oc-aviso">Não anunciei: ${esc(vd.erroAnuncio)}</div>` : ''}
-      <div class="oc-ctrl"><button type="button" class="oc-btn" data-vd-conf-ok ${vd.anunciando || !(v > 0) ? 'disabled' : ''}>${vd.anunciando ? 'anunciando…' : 'Confirmar e anunciar'}</button>
+      <div class="oc-ctrl"><button type="button" class="oc-btn" data-vd-conf-ok ${vd.anunciando || !(v > 0) || ouro < pensao ? 'disabled' : ''}>${vd.anunciando ? 'anunciando…' : 'Confirmar e anunciar'}</button>
         <button type="button" class="oc-link" data-vd-conf-nao ${vd.anunciando ? 'disabled' : ''}>cancelar</button></div>
     </div>`;
   }
@@ -1035,6 +1017,7 @@
       ${res.lendario ? '<div class="oc-caixa">Lendário não tem nota, e o preço dele depende de outras coisas: a extensão ainda não avalia lendários.</div>' : ''}
       ${r.n == null && !res.lendario ? '<div class="oc-caixa">Sem a nota não dá para comparar com as vendas: digite a nota da ficha acima.</div>' : (res.porMoeda ?? []).map((m) => blocoMoeda(m, r, res.pode?.ok && !!OC.mercado?.anunciar)).join('')}
       ${npc ? `<p class="oc-nota">${npc}</p>` : ''}
+      ${res.sacrificio ? `<p class="oc-nota">No altar do Sacrifício ele vale ${res.sacrificio.exato != null ? `${num(res.sacrificio.exato)} pontos` : `entre ${num(res.sacrificio.de)} e ${num(res.sacrificio.ate)} pontos (a Wiki só mostra os degraus vizinhos)`}; a barra paga o 1º nível com 50.</p>` : ''}
       <p class="oc-nota">Avaliado ${ha(res.em ?? Date.now())}. <button type="button" class="oc-link" data-vd-reavaliar="${esc(r.pid)}">reavaliar</button>${r.sh ? ' · shiny só é vendido em Gemas.' : ''}</p>
     </div>`;
   }
@@ -1077,9 +1060,10 @@
       salvarPrefs(); avaliarVd(meuPk(id));
     });
     for (const b of raiz.querySelectorAll('[data-vd-anunciar]')) b.addEventListener('click', () => {
-      vd.confirmar = { pkId: b.dataset.vdPk, preco: String(b.dataset.vdAnunciar), moeda: b.dataset.vdMoeda }; vd.erroAnuncio = null; redesenharVenda(true);
+      vd.confirmar = { pkId: b.dataset.vdPk, preco: String(b.dataset.vdAnunciar), moeda: b.dataset.vdMoeda, dias: OC.mercado?.diasDoJogo?.() ?? 1 }; vd.erroAnuncio = null; redesenharVenda(true);
     });
     raiz.querySelector('[data-vd-conf-preco]')?.addEventListener('change', (e) => { if (vd.confirmar) { vd.confirmar.preco = e.target.value; redesenharVenda(true); } });
+    raiz.querySelector('[data-vd-conf-dias]')?.addEventListener('change', (e) => { if (vd.confirmar) { vd.confirmar.dias = e.target.value; redesenharVenda(true); } });
     raiz.querySelector('[data-vd-conf-nao]')?.addEventListener('click', () => { vd.confirmar = null; vd.erroAnuncio = null; redesenharVenda(true); });
     raiz.querySelector('[data-vd-conf-ok]')?.addEventListener('click', async () => {
       const c = vd.confirmar, pk = c && meuPk(c.pkId);
@@ -1090,7 +1074,9 @@
       if (!(v > 0)) return;
       vd.anunciando = true; vd.erroAnuncio = null; redesenharVenda(true);
       try {
-        const an = await OC.mercado.anunciar({ pokemonId: pk.id, preco: v, moeda: c.moeda, nome: `${nomePk(pk)} nv ${pk.level}` });
+        const campoDias = raiz.querySelector('[data-vd-conf-dias]');
+        const dias = Math.min(30, Math.max(1, Math.floor(Number(campoDias?.value ?? c.dias) || 1)));
+        const an = await OC.mercado.anunciar({ pokemonId: pk.id, preco: v, moeda: c.moeda, dias, nome: `${nomePk(pk)} nv ${pk.level}` });
         vd.anunciado = { id: an?.id ?? null, nome: nomePk(pk), lv: Number(pk.level), preco: v, moeda: c.moeda, em: Date.now() };
         vd.confirmar = null; vd.cache.delete(String(pk.id));
       } catch (e) { vd.erroAnuncio = e?.message ?? String(e); }
@@ -1286,7 +1272,11 @@
     const ctx = { especies: jogo.especies, welcome, eu };
     const mc = analise?.op?.multCaptura || 1;
     const agora = Number(eu?.servidorAgora) || Date.now();
-    const lure = agora < (Number(eu?.loja?.boosts?.shiny) || 0) ? 2 : 1;
+    // Wiki: o Shiny Secret Lure dobra; o +15% de Secret Lure da Kick multiplica por cima
+    const lureLoja = agora < (Number(eu?.loja?.boosts?.shiny) || 0) ? 2 : 1;
+    const lureKick = agora < (Number(eu?.kick?.bonus?.shiny) || 0) ? 1 + (Number(eu?.kick?.pct) || 15) / 100 : 1;
+    const lure = lureLoja * lureKick;
+    const lureTxt = [lureLoja > 1 && 'Secret Lure ×2', lureKick > 1 && `Kick ×${dec(lureKick, 2)}`].filter(Boolean).join(' e ');
     const pShiny = (Number(welcome?.chanceShiny) || 1 / 24000) * lure;
     const temBeast = (OC.estoque?.(eu, 'bola', 5) ?? 0) > 0;
     const bolas = OC.BOLAS.filter((b) => !b.premium || temBeast);
@@ -1315,14 +1305,14 @@
         <td>${pct(x.parte)}</td><td>${x.corposH ? num(x.corposH) : (x.liberada ? 'não mata' : 'trancada')}</td>
         <td>${x.cap ? `${dec(x.cap, 1)}/h<small>1 a cada ${tempo(1 / x.cap)}</small>` : '—'}</td>
         <td>${x.cap ? tempo(1 / (x.cap * POT3)) : '—'}</td>
-        <td>${x.corposH ? tempo(1 / (x.corposH * pShiny * chance(melhorBola))) : '—'}</td>
+        <td>${(x.h?.area ?? x.h?.regiao) === 'outland' ? 'não rola' : x.corposH ? tempo(1 / (x.corposH * pShiny * chance(melhorBola))) : '—'}</td>
         <td>${ir ? `${curto(x.r.xpPkH)}${melhorXp ? `<small>${x.r.xpPkH >= melhorXp ? 'o seu melhor' : `${Math.round((1 - x.r.xpPkH / melhorXp) * 100)}% menos`}</small>` : ''}` : '—'}</td>
         <td>${ir ? `<button type="button" class="oc-link" data-alvo-ir="${esc(x.h.slug)}" data-bola="${esc(melhorBola.chave)}">caçar aqui</button>` : ''}</td></tr>`;
     }).join('');
     const semHunt = !hunts.length ? `<div class="oc-aviso">${esc(esp.name)} não aparece em hunt nenhuma. ${lend ? 'Lendário e mítico só saem da Arena Mística: o Mystic Ticket abre a arena com um dos 110 sorteado (0,91% de ser ele) e dá uma bola só (0,4% na Ultra, 0,5% na Beast, o dobro com Capture Boost).' : mega ? 'Mega não se captura: é fabricada a partir da espécie base, com a Mega Stone dela.' : 'Dá para tentar no Safari (cada aparição tem 0,10% de ser ela, e ela sai no dobro do nível de captura) ou evoluir uma forma anterior.'}</div>` : '';
     return topo + `<div class="oc-linha"><b>${esc(esp.name)}</b> (#${esp.pokeId}) · ${OC.tiposDe(esp).map((t) => TIPO[t] ?? t).join('/')} · ${teto === 100 ? 'nasce no nível da hunt, até o 100' : `nasce no nível da hunt até o 100; acima disso, no ${teto}`} ·
         <button type="button" class="oc-link" data-acao="alvo-limpar">trocar</button></div>
-      <div class="oc-linha">Chance por corpo caído${mc > 1 ? ` (com ×${dec(mc, 2)} de captura)` : ''}: ${chances}. Shiny: 1 em ${num(1 / pShiny)} arremessos${lure > 1 ? ' (Secret Lure ligado)' : ''}.</div>
+      <div class="oc-linha">Chance por corpo caído${mc > 1 ? ` (com ×${dec(mc, 2)} de captura)` : ''}: ${chances}. Shiny: 1 em ${num(1 / pShiny)} arremessos${lure > 1 ? ` (${lureTxt})` : ''}. O brilho é sorteado no arremesso e foge se a bola falhar, então o tempo até ter um depende das capturas por hora. Na Outland o shiny não rola.</div>
       ${semHunt}
       ${hunts.length ? `<div class="oc-tabela"><table><thead><tr><th>Hunt</th><th>Dela</th><th>Corpos dela/h</th><th>Capturas (${esc(melhorBola.nome)})</th><th>Uma P3+</th><th>Uma shiny</th><th>XP/h</th><th></th></tr></thead><tbody>${linhas}</tbody></table></div>` : ''}
       <p class="oc-nota">“Dela” é a parte dos selvagens da hunt que são dessa espécie. Os tempos usam o ritmo de abates do seu pokémon em cada hunt e a melhor bola que você tem; P3 ou mais sai em ${dec(POT3 * 100, 1)}% das capturas e qualidade 1,5+ em ${dec(QUAL15 * 100, 1)}%. Nas hunts acima do Nv 100 o capturado nasce no teto da espécie (${teto}). Em “caçar aqui”, a pokébola dos Ajustes passa a ser a ${esc(melhorBola.nome)} e a aba Setup monta a mochila e leva você até lá.</p>`;

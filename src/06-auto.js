@@ -188,7 +188,7 @@
     const p = prefs(), modo = p.autoForcar;
     const raw = modo === 'rope' ? p.saida_rope : modo === 'desistir' ? p.saida_desistir : null;
     if (!raw) return false;
-    registrar(modo === 'rope' ? 'usando uma Escape Rope para sair do combate' : 'desistindo do combate (custa 10% do XP do nível, se não houver Atrasados)');
+    registrar(modo === 'rope' ? 'usando uma Escape Rope para sair do combate' : 'desistindo do combate (custa 10% do XP do nível)');
     try { OC.socket?.send(raw); } catch { return false; }
     ultimaAcao = Date.now();
     const fim = Date.now() + 10000;

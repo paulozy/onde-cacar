@@ -6,9 +6,32 @@
   const OC = root.__ondeCacar;
   if (!OC) return;
 
-  // comissão de 15% em Coins (a mesma do ranking da Outland, 03-motor.js) e 15% em Gemas; 1.000 Gemas sacam US$ 10
-  const COMISSAO = { gold: 0.15, orb: 0.15 };
-  const USD_POR_GEMA = 0.01;
+  // Wiki (Todas as taxas): anúncio em Ouro paga 15%. Pokemon em Gema paga por faixa, como imposto
+  // de renda: 13% até 500, 10% de 500 a 5.000 e 7,5% acima. Sai do vendedor, só quando vende.
+  const FAIXAS_GEMA = [[500, 0.13], [5000, 0.10], [Infinity, 0.075]];
+  function comissao(moeda, valor) {
+    valor = Number(valor) || 0;
+    if (moeda !== 'orb') return Math.ceil(valor * 0.15);
+    let c = 0, de = 0;
+    for (const [ate, taxa] of FAIXAS_GEMA) { if (valor <= de) break; c += (Math.min(valor, ate) - de) * taxa; de = ate; }
+    return Math.ceil(c);
+  }
+  const liquidoDe = (moeda, valor) => Math.max(0, Math.floor(valor) - comissao(moeda, valor));
+  const pctComissao = (moeda, valor) => (valor > 0 ? comissao(moeda, valor) / valor : (moeda === 'orb' ? 0.13 : 0.15));
+  // Wiki: a pensão da feira é 100.000 Coins por dia (1 a 30), paga à vista ao publicar; não volta
+  const PENSAO_DIA = 100000;
+  // saque: 1 Gema sai a US$ 0,009 (a compra é a US$ 0,01)
+  const USD_POR_GEMA = 0.009;
+  // Wiki (Sacrifício): pontos pela nota, pelo décimo de baixo; só os degraus que a tabela mostra
+  const PONTOS_SACRIFICIO = { 35: 10, 36: 12, 37: 14, 38: 17, 39: 20, 40: 25, 45: 60, 50: 110, 55: 190, 60: 320, 65: 560, 70: 1000 };
+  function pontosSacrificio(r) {
+    if (r.lendario || r.inicial || !(r.n >= 3.5)) return null;
+    const d = Math.min(70, Math.floor(r.n * 10 + 1e-9));
+    if (PONTOS_SACRIFICIO[d] != null) return { exato: PONTOS_SACRIFICIO[d] };
+    const chaves = Object.keys(PONTOS_SACRIFICIO).map(Number);
+    const baixo = Math.max(...chaves.filter((k) => k < d)), alto = Math.min(...chaves.filter((k) => k > d));
+    return { de: PONTOS_SACRIFICIO[baixo], ate: PONTOS_SACRIFICIO[alto] };
+  }
   const NOTA_MIN = 3.5, NIVEL_MIN = 50;
   const bool = (x) => x === true || x === 1 || x === 'true';
   const soma = (o) => (o && typeof o === 'object' ? Object.values(o).reduce((s, v) => s + (Number(v) || 0), 0) : Number(o) || 0);
@@ -79,7 +102,7 @@
   /** Pode ir ao Mercado? (Wiki: nota 3,5+ e nível 50+, ou shiny ou P5; o inicial é protegido.) */
   function podeAnunciar(r) {
     if (r.inicial) return { ok: false, motivo: 'o pokémon inicial não pode ser vendido' };
-    if (r.sh || r.p === 5) return { ok: true };
+    if (r.sh || r.p === 5 || r.lendario) return { ok: true }; // passe livre (Wiki)
     if (r.lv < NIVEL_MIN) return { ok: false, motivo: `o Mercado pede nível ${NIVEL_MIN}+ (ele está no ${r.lv})` };
     if (r.n != null && r.n < NOTA_MIN) return { ok: false, motivo: `o Mercado pede nota ${String(NOTA_MIN).replace('.', ',')}+ (ele tem ${String(r.n).replace('.', ',')})` };
     return { ok: true };
@@ -139,18 +162,18 @@
       if (opcoes.rapido >= opcoes.justo) opcoes.rapido = redondo(opcoes.justo * 0.95);
       if (!(opcoes.paciente > opcoes.justo)) opcoes.paciente = null;
     }
-    const liquido = (v) => Math.floor(v * (1 - COMISSAO[moeda]));
+    const liquido = (v) => liquidoDe(moeda, v);
     // percentil da nota entre os vendidos da espécie nesta moeda (quão bom ele é para quem compra)
     const vendidos = (OC.preco.vendasDe(r.sp, r.sh) ?? []).filter((v) => v.moeda === moeda && v.n > 0);
     const pct = vendidos.length >= 5 && r.n != null ? Math.round((vendidos.filter((v) => v.n < r.n).length / vendidos.length) * 100) : null;
-    return { moeda, res, est, teto, conc, opcoes, liquido, comissao: COMISSAO[moeda], pctNota: pct, vendidos: vendidos.length };
+    return { moeda, res, est, teto, conc, opcoes, liquido, comissao: pctComissao(moeda, opcoes?.justo ?? est ?? 0), pctNota: pct, vendidos: vendidos.length };
   }
 
   /** Avaliação completa: lê as vendas, olha a vitrine e devolve as sugestões nas moedas que fazem sentido. */
   async function avaliarVenda(pk, { notaManual, forcar = false, aoProgredir } = {}) {
     const r = resumirMeu(pk, { notaManual });
     if (!r || !Number.isFinite(r.sp)) throw new Error('não reconheci a espécie desse pokémon');
-    if (r.lendario) return { r, lendario: true, npc: valorNpc(r), pode: podeAnunciar(r) };
+    if (r.lendario) return { r, lendario: true, npc: valorNpc(r), pode: podeAnunciar(r), em: Date.now() };
     aoProgredir?.('lendo as vendas da espécie…');
     await OC.preco.ler(r.sp, r.nome, r.sh, { forcar, aoProgredir: (n) => aoProgredir?.(`lendo as vendas: página ${n}`) });
     // com as vendas lidas, a estimativa da nota fica melhor
@@ -163,8 +186,8 @@
       try { conc = await concorrencia(r, moeda); } catch { conc = null; }
       porMoeda.push(sugerir(r, moeda, conc));
     }
-    return { r, porMoeda, npc: valorNpc(r), pode: podeAnunciar(r), em: Date.now() };
+    return { r, porMoeda, npc: valorNpc(r), pode: podeAnunciar(r), sacrificio: pontosSacrificio(r), em: Date.now() };
   }
 
-  OC.venda = { resumirMeu, estimarNota, podeAnunciar, valorNpc, avaliarVenda, redondo, COMISSAO, USD_POR_GEMA };
+  OC.venda = { resumirMeu, estimarNota, podeAnunciar, valorNpc, avaliarVenda, redondo, comissao, liquidoDe, pctComissao, pontosSacrificio, PENSAO_DIA, USD_POR_GEMA };
 })(globalThis);

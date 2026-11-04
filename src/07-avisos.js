@@ -71,7 +71,7 @@
   OC.on('estado', (e) => {
     eu = e;
     const naHunt = !!e.huntSlug && !e.noCentro;
-    if (estavaNaHunt && e.noCentro) avisar('equipe', 'A equipe inteira caiu', 'Você está no Centro Pokémon. Sem o Boost dos Atrasados, isso custa 10% do XP do nível.', 60000);
+    if (estavaNaHunt && e.noCentro) avisar('equipe', 'A equipe inteira caiu', 'Você está no Centro Pokémon. Isso custa 10% do XP do nível.', 60000);
     estavaNaHunt = naHunt;
     if (nivelVisto != null && e.level > nivelVisto) setTimeout(checarHuntNova, 3000);
     nivelVisto = e.level;

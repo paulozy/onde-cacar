@@ -111,12 +111,13 @@
    * Anuncia um pokémon seu. Só sai com um clique seu de confirmação (a interface pede). Se o jogo não
    * responder, confere em "meus anúncios" antes de dizer que falhou, e nunca reenvia sozinho.
    */
-  async function anunciar({ pokemonId, preco, moeda, nome = 'pokémon' }) {
+  async function anunciar({ pokemonId, preco, moeda, dias, nome = 'pokémon' }) {
     preco = Math.floor(Number(preco));
     if (!(preco > 0)) throw new Error('preço inválido');
     if (moeda !== 'gold' && moeda !== 'orb') throw new Error('moeda inválida');
     if (pokemonId == null) throw new Error('sem o pokémon');
-    const msg = { t: 'market.criar', tipo: 'pokemon', pokemonId, casaId: null, bicicletaId: null, qtd: 1, preco, moeda, dias: diasDoJogo() };
+    dias = Math.min(30, Math.max(1, Math.floor(Number(dias) || diasDoJogo()))); // Wiki: pensão de 1 a 30 dias
+    const msg = { t: 'market.criar', tipo: 'pokemon', pokemonId, casaId: null, bicicletaId: null, qtd: 1, preco, moeda, dias };
     const txt = `${nome} por ${precoTxt(preco, moeda)}`;
     try {
       const r = await pedir(msg, (m) => m.aba === 'criado' && String(m.anuncio?.pokemonId) === String(pokemonId), { aceitaErro: true });

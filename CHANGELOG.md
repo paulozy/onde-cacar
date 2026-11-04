@@ -1,5 +1,24 @@
 # Changelog
 
+## 2.9.3 — 04/11/2026
+
+- **Boost dos Atrasados removido da interface:** sai da aba Progresso (a coluna "Com Atrasados ×10", o preço em diamantes e o marco do nível dos veteranos), dos Ajustes (o alvo e o valor do diamante, que só serviam a ele) e dos avisos de nocaute. Se o boost estiver ativo numa conta, o ritmo de XP continua contando com ele.
+
+## 2.9.2 — 04/11/2026
+
+### Ajustes à Wiki atual
+- **Comissão do Mercado corrigida.** Anúncio em Coins continua em 15%. Pokemon em Gemas paga por faixa: 13% até 500, 10% até 5.000 e 7,5% acima (10.000 Gemas rendem 9.110, como no exemplo da Wiki). Valem para o "você recebe", o preço líquido e a comparação com o NPC.
+- **Pensão da feira:** a confirmação de anúncio mostra o custo (100.000 Coins por dia, pagos na hora), deixa escolher de 1 a 30 dias, diz quanto sobra depois da pensão em Coins e não deixa anunciar sem ouro para pagá-la.
+- **Gemas em dólar** pelo preço de saque (US$ 0,009), que é o que você recebe de fato.
+- **Lendário tem passe livre no Mercado**, como shiny e P5.
+- **Sacrifício:** o cartão "Por quanto vender" mostra quantos pontos o pokémon vale no altar, pela tabela da Wiki.
+- **Aba Capturar:** o shiny volta a ser descrito como sorteado no arremesso (e perdido se a bola falhar), o +15% de Secret Lure da Kick entra na conta junto com o da Loja, e as hunts da Outland mostram "não rola" na coluna de shiny.
+
+## 2.9.1 — 04/11/2026
+
+### Corrigido
+- Aba Capturar: a chance de shiny dizia "1 em N arremessos", mas o sorteio é na captura (Wiki). O texto agora diz "capturas" e explica que o tempo depende das capturas por hora. A conta já estava certa e já contava o Secret Lure.
+
 ## 2.9.0 — 04/11/2026
 
 ### Anunciar direto da extensão
