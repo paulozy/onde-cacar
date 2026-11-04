@@ -66,7 +66,7 @@
 
     return limpar({
       gerado_em: new Date().toISOString(),
-      extensao: '2.8.1',
+      extensao: '2.8.2',
       jogo_versao: jogo?.versao ?? null,
       navegador: navigator.userAgent,
       modulos: jogo?.mod ? Object.fromEntries(Object.entries(jogo.mod).map(([k, m]) => [k, Object.keys(m ?? {}).length ? Object.keys(m).slice(0, 12) : 'NÃO CARREGOU'])) : jogo,
@@ -120,6 +120,7 @@
       captura: analise?.op && { mult_captura: analise.op.multCaptura },
       sessao_do_jogo: sessaoJogo,
       ajustes: OC.ui?.prefs,
+      mercado_aprendido: OC.mercado?.aprendidas?.(),
     });
   }
 

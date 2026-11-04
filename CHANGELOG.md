@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.8.2 — 04/11/2026
+
+### Preparação para anunciar direto da extensão
+- **Gravador do Mercado:** quando o jogo envia uma mensagem do Mercado que a extensão ainda não conhece (anunciar, cancelar anúncio), ela grava a mensagem e as respostas dos 4 segundos seguintes, sem nick nem dados pessoais. Fica só neste navegador e vai no Diagnóstico. Nada é enviado.
+- O cartão "Por quanto vender" diz se a mensagem de anunciar já foi aprendida.
+
 ## 2.8.1 — 02/11/2026
 
 ### Corrigido

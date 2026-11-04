@@ -58,6 +58,45 @@
     return null;
   }
 
+  // ---- gravador: aprende as mensagens do Mercado que a extensão ainda não conhece --------------
+  // Anunciar, cancelar anúncio e afins nunca passaram por aqui. Quando o jogo manda uma mensagem
+  // "market.*" nova (você clicou num botão dele), ela e as respostas dos 4 s seguintes ficam guardadas
+  // neste navegador e vão no Diagnóstico. Nada é enviado; é só para conhecer o formato.
+  const CONHECIDAS = new Set(['market.listar', 'market.item', 'market.itens', 'market.historicoGlobal', 'market.especies', 'market.comprar']);
+  const CHAVE_APRENDIDO = 'oc-mercado-aprendido';
+  const PESSOAL = /^(nick|nome_?treinador|vendedor|vendedorId|comprador|compradorId|email|e-?mail|senha|password|token|auth|carteira|wallet|endereco|address|ip|telefone|phone)$/i;
+  const semPessoal = (v, prof = 0) => {
+    if (v == null || typeof v !== 'object' || prof > 8) return v;
+    if (Array.isArray(v)) return v.slice(0, 20).map((x) => semPessoal(x, prof + 1));
+    const o = {};
+    for (const [k, x] of Object.entries(v)) o[k] = PESSOAL.test(k) ? '[oculto]' : semPessoal(x, prof + 1);
+    return o;
+  };
+  let aprendidas = [];
+  try { aprendidas = JSON.parse(localStorage.getItem(CHAVE_APRENDIDO) || '[]'); } catch { aprendidas = []; }
+  const guardarAprendidas = () => { try { localStorage.setItem(CHAVE_APRENDIDO, JSON.stringify(aprendidas.slice(-12))); } catch { /* sem espaço */ } };
+  let gravando = null;
+  OC.on('enviado', (txt) => {
+    if (typeof txt !== 'string' || !txt.includes('"market.')) return;
+    let m; try { m = JSON.parse(txt); } catch { return; }
+    if (typeof m?.t !== 'string' || !m.t.startsWith('market.') || CONHECIDAS.has(m.t)) return;
+    gravando = { t: m.t, enviado: semPessoal(m), em: Date.now(), respostas: [] };
+    aprendidas.push(gravando);
+    OC.escutaAte = Date.now() + 4000;
+    guardarAprendidas();
+    registrar(`aprendi uma mensagem nova do Mercado: ${m.t}`);
+  });
+  OC.on('bruto', (txt) => {
+    if (!gravando || Date.now() - gravando.em > 4000 || gravando.respostas.length >= 6) return;
+    let m; try { m = JSON.parse(txt); } catch { return; }
+    let r = semPessoal(m);
+    if (r?.t === 'estado') r = { t: 'estado', mudou: Object.keys(m.estado ?? {}) }; // o estado é grande: basta saber o que mudou
+    let j = JSON.stringify(r);
+    if (j.length > 2500) j = `${j.slice(0, 2500)}…`;
+    gravando.respostas.push({ ms: Date.now() - gravando.em, msg: j });
+    guardarAprendidas();
+  });
+
   // ---- pedidos e respostas -------------------------------------------------------------------
   OC.on('market', (m) => {
     if (!m || typeof m !== 'object') return;
@@ -351,6 +390,9 @@
     categorias: CATEGORIAS,
     lerMedias: () => lerMedias(true),
     pedir, naTela: mercadoNaTela, shinyDe,
+    aprendidas: () => aprendidas.slice(),
+    /** A mensagem de anunciar, se você já anunciou alguma vez pelo jogo com a extensão ligada. */
+    anuncioAprendido: () => [...aprendidas].reverse().find((a) => /anunci|vender|venda|publicar|criar|postar|listar(?!$)/i.test(a.t.replace(/^market\./, '')) && !/cancel|remov|retir/i.test(a.t)) ?? null,
     /** Vitrine de uma espécie pedida pela extensão: marcada para o price check não tomar como a da tela. */
     listarVitrine: async ({ especieId, moeda, soShiny = false }) => {
       const msg = { ...filtrosPokemon({ moeda, especieId, filtros: { shiny: soShiny ? 'so' : 'qualquer' } }), ordem: 'baratos' };

@@ -57,6 +57,9 @@
   function aoReceber(ev) {
     if (typeof ev.data !== 'string') return;
     const cab = ev.data.slice(0, 48);
+    // janela de escuta (gravador do Mercado): por alguns segundos, entrega também o que a extensão
+    // não conhece, para aprender como o jogo responde a uma mensagem nova
+    if (OC.escutaAte > Date.now() && !cab.includes('"t":"campo"') && !cab.includes('"t":"batalha"')) OC.emit('bruto', ev.data);
     let tipo = null;
     if (cab.includes('"t":"welcome"')) tipo = 'welcome';
     else if (cab.includes('"t":"estado"')) tipo = 'estado';

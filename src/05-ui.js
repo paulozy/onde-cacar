@@ -1006,6 +1006,7 @@
       ${res.lendario ? '<div class="oc-caixa">Lendário não tem nota, e o preço dele depende de outras coisas: a extensão ainda não avalia lendários.</div>' : ''}
       ${r.n == null && !res.lendario ? '<div class="oc-caixa">Sem a nota não dá para comparar com as vendas: digite a nota da ficha acima.</div>' : (res.porMoeda ?? []).map(blocoMoeda).join('')}
       ${npc ? `<p class="oc-nota">${npc}</p>` : ''}
+      ${res.pode?.ok && !res.lendario ? `<p class="oc-nota">${OC.mercado?.anuncioAprendido?.() ? `Aprendi a mensagem de anunciar do jogo (${esc(OC.mercado.anuncioAprendido().t)}). Mande o Diagnóstico para eu ligar o "anunciar por este preço".` : 'Para anunciar direto daqui: anuncie um pokémon uma vez pelo próprio jogo, com a extensão ligada, e cancele o anúncio em seguida. A extensão aprende as duas mensagens; depois mande o Diagnóstico.'}</p>` : ''}
       <p class="oc-nota">Avaliado ${ha(res.em ?? Date.now())}. <button type="button" class="oc-link" data-vd-reavaliar="${esc(r.pid)}">reavaliar</button>${r.sh ? ' · shiny só é vendido em Gemas.' : ''}</p>
     </div>`;
   }
