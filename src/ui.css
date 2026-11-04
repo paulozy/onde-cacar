@@ -163,3 +163,10 @@ tr.oc-dim td { opacity: .5; }
 .oc-vd-nota .oc-num { width: 110px; background: #462b39; color: #fff6ef; border: 1px solid #480e1e; border-radius: 5px; padding: 4px; }
 .oc-vd-sel { background: #462b39; color: #fff6ef; border: 1px solid #480e1e; border-radius: 5px; padding: 5px; font: 600 13px "Barlow", system-ui, sans-serif; max-width: 100%; }
 .oc-vd-cands { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+.oc-vd-acoes { display: flex; gap: 8px; flex-wrap: wrap; }
+.oc-vd-acoes .oc-link { font-size: 11.5px; }
+.oc-vd-anunciar { font-weight: 800; color: #9fe39f; }
+.oc-vd-conf { display: flex; flex-direction: column; gap: 6px; padding: 9px; border-radius: 7px; background: #2d3a28; box-shadow: inset 0 0 0 2px #3f9a43; }
+.oc-vd-conf label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; font-weight: 700; }
+.oc-vd-conf .oc-num { width: 170px; background: #462b39; color: #fff6ef; border: 1px solid #480e1e; border-radius: 5px; padding: 5px; }
+.oc-vd-ok { box-shadow: inset 0 0 0 2px #3f9a43; }

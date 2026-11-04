@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.9.0 — 04/11/2026
+
+### Anunciar direto da extensão
+- **Cada preço sugerido em "Por quanto vender" tem o botão "anunciar".** Ele abre uma confirmação no próprio cartão com o pokémon, o preço (dá para ajustar, com os pontos e os atalhos 50m, 1,5b), quanto você recebe depois da comissão e quantos dias o anúncio dura, os mesmos do seu último anúncio pelo jogo. Avisa se há um igual ou melhor mais barato e se o preço está muito abaixo do justo. Nada é enviado sem o "Confirmar e anunciar".
+- **Usa as mesmas mensagens dos botões do jogo** (aprendidas pelo gravador da 2.8.2): market.criar para anunciar e market.cancelar para cancelar.
+- **Confere o resultado:** só mostra "Anunciado" quando o jogo confirma o anúncio daquele pokémon. Se o jogo recusar, mostra o motivo dele. Se não responder, confere em "meus anúncios" antes de dizer que falhou, e nunca reenvia sozinho.
+- **Cancelar:** depois de anunciar, um link cancela o anúncio. Tudo fica no registro da aba Mercado.
+
 ## 2.8.2 — 04/11/2026
 
 ### Preparação para anunciar direto da extensão

@@ -62,7 +62,7 @@
   // Anunciar, cancelar anúncio e afins nunca passaram por aqui. Quando o jogo manda uma mensagem
   // "market.*" nova (você clicou num botão dele), ela e as respostas dos 4 s seguintes ficam guardadas
   // neste navegador e vão no Diagnóstico. Nada é enviado; é só para conhecer o formato.
-  const CONHECIDAS = new Set(['market.listar', 'market.item', 'market.itens', 'market.historicoGlobal', 'market.especies', 'market.comprar']);
+  const CONHECIDAS = new Set(['market.listar', 'market.item', 'market.itens', 'market.historicoGlobal', 'market.especies', 'market.comprar', 'market.criar', 'market.cancelar', 'market.meus']);
   const CHAVE_APRENDIDO = 'oc-mercado-aprendido';
   const PESSOAL = /^(nick|nome_?treinador|vendedor|vendedorId|comprador|compradorId|email|e-?mail|senha|password|token|auth|carteira|wallet|endereco|address|ip|telefone|phone)$/i;
   const semPessoal = (v, prof = 0) => {
@@ -97,6 +97,50 @@
     guardarAprendidas();
   });
 
+  // ---- anunciar e cancelar (as mesmas mensagens que os botões do jogo mandam) ---------------------
+  // Formato aprendido do próprio jogo: market.criar {tipo, pokemonId, casaId, bicicletaId, qtd, preco,
+  // moeda, dias} responde {aba:"criado", anuncio}; market.cancelar {id} e market.meus respondem {aba:"meus"}.
+  /** Quantos dias o anúncio dura: o mesmo do último anúncio que você fez pelo jogo (o jogo usou 1). */
+  const precoTxt = (v, moeda) => `${Number(v).toLocaleString('pt-BR')} ${moeda === 'orb' ? 'Gemas' : 'Coins'}`;
+  const diasDoJogo = () => Number([...aprendidas].reverse().find((a) => a.t === 'market.criar')?.enviado?.dias) || 1;
+  async function meusAnuncios() {
+    const r = await pedir({ t: 'market.meus' }, (m) => m.aba === 'meus', { aceitaErro: true });
+    return r.linhas ?? [];
+  }
+  /**
+   * Anuncia um pokémon seu. Só sai com um clique seu de confirmação (a interface pede). Se o jogo não
+   * responder, confere em "meus anúncios" antes de dizer que falhou, e nunca reenvia sozinho.
+   */
+  async function anunciar({ pokemonId, preco, moeda, nome = 'pokémon' }) {
+    preco = Math.floor(Number(preco));
+    if (!(preco > 0)) throw new Error('preço inválido');
+    if (moeda !== 'gold' && moeda !== 'orb') throw new Error('moeda inválida');
+    if (pokemonId == null) throw new Error('sem o pokémon');
+    const msg = { t: 'market.criar', tipo: 'pokemon', pokemonId, casaId: null, bicicletaId: null, qtd: 1, preco, moeda, dias: diasDoJogo() };
+    const txt = `${nome} por ${precoTxt(preco, moeda)}`;
+    try {
+      const r = await pedir(msg, (m) => m.aba === 'criado' && String(m.anuncio?.pokemonId) === String(pokemonId), { aceitaErro: true });
+      registrar(`anunciei ${txt} (anúncio ${r.anuncio?.id})`, 'ok');
+      return r.anuncio;
+    } catch (e) {
+      if (e.doJogo) { registrar(`o jogo recusou o anúncio de ${txt}: ${e.message}`, 'erro'); throw e; }
+      // sem resposta: o anúncio pode ter entrado mesmo assim
+      try {
+        const meu = (await meusAnuncios()).find((l) => String(l.pokemonId) === String(pokemonId));
+        if (meu) { registrar(`anunciei ${txt} (anúncio ${meu.id}; confirmado em "meus anúncios")`, 'ok'); return meu; }
+      } catch { /* segue para o erro */ }
+      registrar(`não consegui confirmar o anúncio de ${txt}: ${e.message}`, 'erro');
+      throw new Error(`${e.message}. Confira em "Meus anúncios" no jogo antes de tentar de novo.`);
+    }
+  }
+  async function cancelarAnuncio(id) {
+    const r = await pedir({ t: 'market.cancelar', id }, (m) => m.aba === 'meus', { aceitaErro: true });
+    const ainda = (r.linhas ?? []).some((l) => String(l.id) === String(id));
+    if (ainda) throw new Error('o anúncio continua na lista');
+    registrar(`cancelei o anúncio ${id}`, 'ok');
+    return true;
+  }
+
   // ---- pedidos e respostas -------------------------------------------------------------------
   OC.on('market', (m) => {
     if (!m || typeof m !== 'object') return;
@@ -109,22 +153,29 @@
     if (esperando && esperando.bate(m)) { const e = esperando; esperando = null; e.ok(m); }
   });
 
+  // quando o pedido é uma ação (anunciar, cancelar), a recusa do jogo chega como t:"erro"
+  OC.on('erro', (m) => {
+    if (!esperando?.aceitaErro) return;
+    const e = esperando; esperando = null;
+    e.falha(Object.assign(new Error(m?.msg ?? m?.texto ?? m?.mensagem ?? m?.chave ?? 'o jogo recusou'), { doJogo: true }));
+  });
+
   // um pedido por vez: a resposta do Mercado não traz o número do pedido, então a fila garante
   // que a próxima resposta é a deste pedido
   let fila = Promise.resolve();
   let listouEm = 0; // quando o sniper pediu uma vitrine (para o price check não confundir com a sua)
-  function pedir(msg, bate) {
-    const p = fila.then(() => pedirAgora(msg, bate));
+  function pedir(msg, bate, opcoes) {
+    const p = fila.then(() => pedirAgora(msg, bate, opcoes));
     fila = p.catch(() => {});
     return p;
   }
-  async function pedirAgora(msg, bate) {
+  async function pedirAgora(msg, bate, { aceitaErro = false } = {}) {
     const espera = ultimoPedido + ESPACO_MS - Date.now();
     if (espera > 0) await dormir(espera);
     if (OC.socket?.readyState !== 1) throw new Error('sem conexão com o jogo');
     ultimoPedido = Date.now();
     const resposta = new Promise((ok, falha) => {
-      esperando = { bate, ok };
+      esperando = { bate, ok, falha, aceitaErro };
       setTimeout(() => { if (esperando?.ok === ok) { esperando = null; falha(new Error('o Mercado não respondeu')); } }, 6000);
     });
     OC.enviar(msg);
@@ -391,6 +442,10 @@
     lerMedias: () => lerMedias(true),
     pedir, naTela: mercadoNaTela, shinyDe,
     aprendidas: () => aprendidas.slice(),
+    meusAnuncios,
+    diasDoJogo,
+    anunciar,
+    cancelarAnuncio,
     /** A mensagem de anunciar, se você já anunciou alguma vez pelo jogo com a extensão ligada. */
     anuncioAprendido: () => [...aprendidas].reverse().find((a) => /anunci|vender|venda|publicar|criar|postar|listar(?!$)/i.test(a.t.replace(/^market\./, '')) && !/cancel|remov|retir/i.test(a.t)) ?? null,
     /** Vitrine de uma espécie pedida pela extensão: marcada para o price check não tomar como a da tela. */

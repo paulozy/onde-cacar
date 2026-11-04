@@ -944,7 +944,7 @@
   }
 
   // ---- Por quanto vender um pokémon seu ---------------------------------------------------------
-  const vd = { pkId: null, cache: new Map(), lendo: false, status: '', erro: null, ficha: null, modo: 'venda', modoAtivo: null };
+  const vd = { pkId: null, cache: new Map(), lendo: false, status: '', erro: null, ficha: null, modo: 'venda', modoAtivo: null, confirmar: null, anunciando: false, erroAnuncio: null, anunciado: null };
   const notasDigitadas = () => (prefs.vdNotas ??= {});
   const nomePk = (p) => p?.apelido || jogo?.especies?.get?.(Number(p?.speciesId))?.name || p?.nome || `#${p?.speciesId}`;
   const meuPk = (id) => (eu?.pokemons ?? []).find((p) => String(p.id) === String(id)) ?? null;
@@ -971,7 +971,7 @@
     redesenharVenda(true);
   }
 
-  function blocoMoeda(m) {
+  function blocoMoeda(m, r, podeAnunciar) {
     const M = m.moeda, nomeM = M === 'orb' ? 'Gemas' : 'Coins', o = m.opcoes, c = m.conc;
     const usd = (v) => (M === 'orb' ? ` <small>≈ US$ ${dec(v * OC.venda.USD_POR_GEMA, 2)}</small>` : '');
     const concTxt = !c ? 'Não consegui olhar os anúncios abertos agora.'
@@ -981,7 +981,7 @@
     if (!o) return `<div class="oc-vd-moeda"><h5>Em ${nomeM}</h5><p class="oc-nota">Sem venda parecida em ${nomeM} nos últimos 30 dias e sem anúncio igual ou melhor para comparar. ${esc(concTxt)}</p></div>`;
     const col = (k, rot) => !o[k] ? '' : `<div class="oc-vd-op${k === 'justo' ? ' oc-vd-rec' : ''}"><span class="oc-rot">${rot}</span><b>${precoTxt(o[k], M)}</b>
       <small>você recebe ${precoTxt(m.liquido(o[k]), M)}${usd(m.liquido(o[k]))}</small>
-      <button type="button" class="oc-link" data-vd-copiar="${o[k]}">copiar</button></div>`;
+      <span class="oc-vd-acoes">${podeAnunciar ? `<button type="button" class="oc-link oc-vd-anunciar" data-vd-anunciar="${o[k]}" data-vd-moeda="${M}" data-vd-pk="${esc(r.pid)}">anunciar</button>` : ''}<button type="button" class="oc-link" data-vd-copiar="${o[k]}">copiar</button></span></div>`;
     const base = m.est ? `Pelas vendas: justo ${precoTxt(m.est, M)}, faixa normal ${precoTxt(m.res.p25, M)} a ${precoTxt(m.res.p75, M)} (confiança ${m.res.confianca}, ${num(m.res.grupo)} vendas da espécie).`
       : 'Sem venda parecida: as sugestões saem só dos anúncios abertos.';
     return `<div class="oc-vd-moeda"><h5>Em ${nomeM} <small>comissão de ${Math.round(m.comissao * 100)}%</small></h5>
@@ -989,6 +989,34 @@
       <p class="oc-nota">${base} ${esc(concTxt)}${m.pctNota != null ? ` A nota dele é maior que a de ${m.pctNota}% dos vendidos em ${nomeM}.` : ''}</p></div>`;
   }
 
+  function caixaConfirmar(res) {
+    const c = vd.confirmar, r = res.r, M = c.moeda, nomeM = M === 'orb' ? 'Gemas' : 'Coins';
+    const v = parseValor(c.preco), m = res.porMoeda?.find((x) => x.moeda === M);
+    const dias = OC.mercado?.diasDoJogo?.() ?? 1;
+    const avisos = [];
+    if (!(v > 0)) avisos.push('Digite um preço válido.');
+    else {
+      if (m?.teto && v >= m.teto) avisos.push(`Tem anúncio igual ou melhor que o seu por ${precoTxt(m.teto, M)}: acima disso, quem compra leva o outro.`);
+      if (m?.est && v < m.est * 0.8) avisos.push(`Está ${Math.round((1 - v / m.est) * 100)}% abaixo do preço justo (${precoTxt(m.est, M)}).`);
+    }
+    const liq = v > 0 ? Math.floor(v * (1 - OC.venda.COMISSAO[M])) : 0;
+    return `<div class="oc-vd-conf">
+      <b>Anunciar ${esc(r.apelido || r.nome)} nv ${num(r.lv)} no Mercado?</b>
+      <label>Preço em ${nomeM}${campoDin('data-vd-conf-preco', c.preco)}</label>
+      <p class="oc-nota">O anúncio dura ${dias} dia${dias > 1 ? 's' : ''}, como o seu último anúncio feito pelo jogo.${v > 0 ? ` Se vender, você recebe ${precoTxt(liq, M)} depois da comissão de ${Math.round(OC.venda.COMISSAO[M] * 100)}%${M === 'orb' ? ` (≈ US$ ${dec(liq * OC.venda.USD_POR_GEMA, 2)})` : ''}.` : ''}</p>
+      ${avisos.map((a) => `<div class="oc-aviso">${esc(a)}</div>`).join('')}
+      ${vd.erroAnuncio ? `<div class="oc-aviso">Não anunciei: ${esc(vd.erroAnuncio)}</div>` : ''}
+      <div class="oc-ctrl"><button type="button" class="oc-btn" data-vd-conf-ok ${vd.anunciando || !(v > 0) ? 'disabled' : ''}>${vd.anunciando ? 'anunciando…' : 'Confirmar e anunciar'}</button>
+        <button type="button" class="oc-link" data-vd-conf-nao ${vd.anunciando ? 'disabled' : ''}>cancelar</button></div>
+    </div>`;
+  }
+  function caixaAnunciado() {
+    const a = vd.anunciado;
+    if (!a || Date.now() - a.em > 30 * 60000) return '';
+    return `<div class="oc-caixa oc-vd-ok">${a.cancelado ? 'Anúncio cancelado' : '✓ Anunciado'}: ${esc(a.nome)} nv ${num(a.lv)} por ${precoTxt(a.preco, a.moeda)}${a.id != null ? ` (anúncio ${esc(a.id)})` : ''}.
+      ${a.cancelado ? '' : `<button type="button" class="oc-link" data-vd-desfazer="${esc(a.id)}" ${a.cancelando ? 'disabled' : ''}>${a.cancelando ? 'cancelando…' : 'cancelar o anúncio'}</button>`}
+      ${a.erro ? `<div class="oc-aviso">${esc(a.erro)}</div>` : ''}</div>`;
+  }
   function cartaoVenda(res) {
     const r = res.r;
     const origem = { jogo: '', manual: ' <small>(digitada)</small>', estimada: ` <small>(estimada pelas vendas${r.notaErro >= 0.01 ? `, ±${dec(r.notaErro, 2)}` : ''})</small>`, sem: '' }[r.origemNota] ?? '';
@@ -1001,18 +1029,21 @@
     return `<div class="oc-vd">
       <div class="oc-pc-l1"><span><b>${esc(r.apelido || r.nome)}</b>${r.apelido ? ` <small>${esc(r.nome)}</small>` : ''} nv ${num(r.lv)} ${tags}</span></div>
       <div class="oc-pc-l2">P${r.p} · ${notaTxt} · IV ${num(r.iv)} · Q ${dec(r.q, 3)}</div>
+      ${vd.confirmar && String(vd.confirmar.pkId) === String(r.pid) ? caixaConfirmar(res) : ''}
       ${pedirNota}
       ${!res.pode?.ok ? `<div class="oc-aviso">Não dá para anunciar: ${esc(res.pode.motivo)}.</div>` : ''}
       ${res.lendario ? '<div class="oc-caixa">Lendário não tem nota, e o preço dele depende de outras coisas: a extensão ainda não avalia lendários.</div>' : ''}
-      ${r.n == null && !res.lendario ? '<div class="oc-caixa">Sem a nota não dá para comparar com as vendas: digite a nota da ficha acima.</div>' : (res.porMoeda ?? []).map(blocoMoeda).join('')}
+      ${r.n == null && !res.lendario ? '<div class="oc-caixa">Sem a nota não dá para comparar com as vendas: digite a nota da ficha acima.</div>' : (res.porMoeda ?? []).map((m) => blocoMoeda(m, r, res.pode?.ok && !!OC.mercado?.anunciar)).join('')}
       ${npc ? `<p class="oc-nota">${npc}</p>` : ''}
-      ${res.pode?.ok && !res.lendario ? `<p class="oc-nota">${OC.mercado?.anuncioAprendido?.() ? `Aprendi a mensagem de anunciar do jogo (${esc(OC.mercado.anuncioAprendido().t)}). Mande o Diagnóstico para eu ligar o "anunciar por este preço".` : 'Para anunciar direto daqui: anuncie um pokémon uma vez pelo próprio jogo, com a extensão ligada, e cancele o anúncio em seguida. A extensão aprende as duas mensagens; depois mande o Diagnóstico.'}</p>` : ''}
       <p class="oc-nota">Avaliado ${ha(res.em ?? Date.now())}. <button type="button" class="oc-link" data-vd-reavaliar="${esc(r.pid)}">reavaliar</button>${r.sh ? ' · shiny só é vendido em Gemas.' : ''}</p>
     </div>`;
   }
 
   /** O que a avaliação mostra (o mesmo na aba Preço e na gaveta). */
   function listaVenda() {
+    return caixaAnunciado() + listaVendaCorpo();
+  }
+  function listaVendaCorpo() {
     const cands = vd.ficha?.ids?.length > 1 && !vd.pkId ? vd.ficha.ids.map(meuPk).filter(Boolean) : null;
     if (cands) return `<div class="oc-caixa">Essa ficha bate com mais de um pokémon seu. Qual é?</div>
       <div class="oc-vd-cands">${cands.map((p) => `<button type="button" class="oc-btn" data-vd-escolher="${esc(p.id)}">${esc(nomePk(p))} nv ${num(p.level)} P${p.potencia || 1} Q ${dec(Number(p.quality ?? p.qualidade) || 0, 3)}</button>`).join('')}</div>`;
@@ -1044,6 +1075,33 @@
       const v = Number(String(el.value).replace(',', '.')), id = el.dataset.vdNota;
       if (v > 0 && v <= 10) notasDigitadas()[id] = v; else delete notasDigitadas()[id];
       salvarPrefs(); avaliarVd(meuPk(id));
+    });
+    for (const b of raiz.querySelectorAll('[data-vd-anunciar]')) b.addEventListener('click', () => {
+      vd.confirmar = { pkId: b.dataset.vdPk, preco: String(b.dataset.vdAnunciar), moeda: b.dataset.vdMoeda }; vd.erroAnuncio = null; redesenharVenda(true);
+    });
+    raiz.querySelector('[data-vd-conf-preco]')?.addEventListener('change', (e) => { if (vd.confirmar) { vd.confirmar.preco = e.target.value; redesenharVenda(true); } });
+    raiz.querySelector('[data-vd-conf-nao]')?.addEventListener('click', () => { vd.confirmar = null; vd.erroAnuncio = null; redesenharVenda(true); });
+    raiz.querySelector('[data-vd-conf-ok]')?.addEventListener('click', async () => {
+      const c = vd.confirmar, pk = c && meuPk(c.pkId);
+      if (!c || !pk || vd.anunciando) return;
+      const campo = raiz.querySelector('[data-vd-conf-preco]');
+      if (campo) c.preco = campo.value; // o valor digitado vale mesmo sem sair do campo
+      const v = parseValor(c.preco);
+      if (!(v > 0)) return;
+      vd.anunciando = true; vd.erroAnuncio = null; redesenharVenda(true);
+      try {
+        const an = await OC.mercado.anunciar({ pokemonId: pk.id, preco: v, moeda: c.moeda, nome: `${nomePk(pk)} nv ${pk.level}` });
+        vd.anunciado = { id: an?.id ?? null, nome: nomePk(pk), lv: Number(pk.level), preco: v, moeda: c.moeda, em: Date.now() };
+        vd.confirmar = null; vd.cache.delete(String(pk.id));
+      } catch (e) { vd.erroAnuncio = e?.message ?? String(e); }
+      vd.anunciando = false; redesenharVenda(true);
+    });
+    raiz.querySelector('[data-vd-desfazer]')?.addEventListener('click', async () => {
+      const a = vd.anunciado;
+      if (!a || a.cancelando || a.id == null) return;
+      a.cancelando = true; a.erro = null; redesenharVenda(true);
+      try { await OC.mercado.cancelarAnuncio(a.id); a.cancelado = true; } catch (e) { a.erro = `Não consegui cancelar: ${e?.message ?? e}. Cancele em "Meus anúncios" no jogo.`; }
+      a.cancelando = false; redesenharVenda(true);
     });
     for (const b of raiz.querySelectorAll('[data-vd-copiar]')) b.addEventListener('click', async () => {
       try { await navigator.clipboard.writeText(String(b.dataset.vdCopiar)); b.textContent = 'copiado'; } catch { b.textContent = 'não deu para copiar'; }
