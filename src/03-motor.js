@@ -6,6 +6,8 @@
 (function (root) {
   'use strict';
   const OC = (root.__ondeCacar ??= {});
+  /** Bônus de live resgatado (Twitch ou Kick): 1 + pct se a recompensa `chave` (xp, captura, shiny) está valendo. */
+  OC.bonusLive = (lv, chave, agora = Date.now()) => (lv && agora < (Number(lv.bonus?.[chave]) || 0) ? 1 + (Number(lv.pct) || 15) / 100 : 1);
 
   const R = {
     randMin: 0.85, randMax: 1, rand: 0.925, stab: 1.5,
@@ -122,10 +124,14 @@
       const sac = eu?.sacrificio ?? l.sacrificio;
       if (sac && agora < (Number(sac.ate ?? sac.boostAte ?? sac.expira) || 0) && !itens.some((i) => i.nome === 'Sacrifício')) somar('Sacrifício', 1.2, 'ambos');
     }
+    // Wiki: Twitch e Kick funcionam igual, por horas resgatadas com pontos do canal (+15% cada)
+    for (const [nome, lv] of [['Twitch', eu?.twitch], ['Kick', eu?.kick]]) {
+      const m = OC.bonusLive(lv, 'xp', agora);
+      if (m > 1) somar(nome, m, 'ambos');
+    }
+    // formato antigo da Twitch (bônus enquanto assiste), caso o jogo ainda mande assim
     const tw = eu?.twitch;
-    if (tw?.assistindo && Number(tw.pctAtual) > 0) somar('Twitch', 1 + tw.pctAtual / 100, 'ambos');
-    const kk = eu?.kick;
-    if (agora < (Number(kk?.bonus?.xp) || 0) && Number(kk?.pct) > 0) somar('Kick', 1 + kk.pct / 100, 'ambos');
+    if (!tw?.bonus && tw?.assistindo && Number(tw.pctAtual) > 0) somar('Twitch', 1 + tw.pctAtual / 100, 'ambos');
     const ev = eu?.evento;
     if (ev && agora < (ev.terminaEm ?? 0)) {
       somar('Evento', 1 + (Number(ev.xpPokemonPct) || 0) / 100, 'pk');
@@ -505,8 +511,8 @@
     op.mult = bonusXp(ctx.eu, ctx);
     const agora = Number(ctx.eu?.servidorAgora) || Date.now();
     const boostCap = agora < (Number(ctx.eu?.loja?.boosts?.captura) || 0) ? ((ctx.welcome?.tiposBoost ?? []).find((b) => b.chave === 'captura')?.mult ?? 2) : 1;
-    const kickCap = agora < (Number(ctx.eu?.kick?.bonus?.captura) || 0) ? 1 + (Number(ctx.eu?.kick?.pct) || 15) / 100 : 1;
-    op.multCaptura = boostCap * kickCap;
+    // Wiki: o +15% de captura da Twitch e o da Kick multiplicam o Capture Boost e um ao outro (×2,645)
+    op.multCaptura = boostCap * OC.bonusLive(ctx.eu?.twitch, 'captura', agora) * OC.bonusLive(ctx.eu?.kick, 'captura', agora);
     const boostLoot = agora < (Number(ctx.eu?.loja?.boosts?.loot) || 0) ? ((ctx.welcome?.tiposBoost ?? []).find((b) => b.chave === 'loot')?.mult ?? 1.4) : 1;
     op.multLoot = boostLoot * (1 + (Number(ctx.eu?.guildBonusPct) || 0) / 100);
     op.calib = OC.sessao?.calibracao?.() ?? {};

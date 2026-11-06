@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.9.4 — 06/11/2026
+
+### Ajustes à Wiki atual
+- **Twitch agora funciona como a Kick:** o bônus sai de recompensas resgatadas com pontos do canal (+15% de XP, de captura e de Secret Lure, por hora) e não mais de assistir. Os três entram no ritmo, na captura e na chance de shiny, multiplicando com a Loja e com a Kick (Capture Boost + Twitch + Kick = ×2,645). Nos tempos da aba Progresso, o bônus da Twitch conta até vencer, como os outros. Saiu a opção "contar a live nos tempos".
+- **Bosses:** os marcos da aba Progresso seguem a escada nova de três bosses por região (Kanto 300, Johto 650, Hoenn 3.100, Sinnoh 9.750, Unova 22.700, Kalos 44.050, Alola 75.900), com o prêmio de cada posição na trinca em Kanto.
+- **Venda ao NPC:** o cartão "Por quanto vender" avisa que, para quem evoluiu depois de 06/11, o NPC paga pela espécie em que o pokémon foi capturado, que o jogo não informa.
+
 ## 2.9.3 — 04/11/2026
 
 - **Boost dos Atrasados removido da interface:** sai da aba Progresso (a coluna "Com Atrasados ×10", o preço em diamantes e o marco do nível dos veteranos), dos Ajustes (o alvo e o valor do diamante, que só serviam a ele) e dos avisos de nocaute. Se o boost estiver ativo numa conta, o ritmo de XP continua contando com ele.

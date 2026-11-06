@@ -12,7 +12,7 @@
     pocao: 'auto', bola: 'auto', vender: true, bike: 0, precoBeast: 100, hpMinimo: 0.35, horas: 4, sel: null,
     autoRepor: false, autoTrocar: false, autoMinHoras: 1, autoReserva: 1000000, autoTetoHora: 3000000,
     mercadoLigado: false, mercadoLimiteGold: 50000000, mercadoGemas: false, mercadoLimiteOrb: 0, precoOutlandDoMercado: true,
-    ginasios: [], contarLive: false, avisoSom: false, avisoPotMin: 3, avisoQualMin: 1.5, avisoIvMin: 150,
+    ginasios: [], avisoSom: false, avisoPotMin: 3, avisoQualMin: 1.5, avisoIvMin: 150,
     ...lerJ(CHAVE_PREFS, {}),
   };
   if (prefs.aba === 'comprar') prefs.aba = 'alvo'; // a aba Comprar saiu na 2.1
@@ -474,11 +474,10 @@
   /** Os multiplicadores do treinador que estão no ritmo, cada um com quando acaba (ms; Infinity = fixo). */
   function boostsDoTreinador() {
     const l = eu?.loja ?? {}, agora = Number(eu?.servidorAgora) || Date.now();
-    const venc = { 'VIP': Number(l.vipAte), 'XP Boost': Number(l.boosts?.xp), 'Kick': Number(eu?.kick?.bonus?.xp), 'Evento (treinador)': Number(eu?.evento?.terminaEm) };
+    const venc = { 'VIP': Number(l.vipAte), 'XP Boost': Number(l.boosts?.xp), 'Kick': Number(eu?.kick?.bonus?.xp), 'Twitch': Number(eu?.twitch?.bonus?.xp), 'Evento (treinador)': Number(eu?.evento?.terminaEm) };
     return (analise?.bonus?.itens ?? []).filter((i) => i.quem !== 'pk').map((i) => {
       let ate = venc[i.nome];
-      if (i.nome === 'Twitch') ate = prefs.contarLive ? Infinity : agora; // só enquanto você assiste
-      else if (!Number.isFinite(ate) || !ate) ate = Infinity;              // guild e outros: sem data
+      if (!Number.isFinite(ate) || !ate) ate = Infinity;              // guild e outros: sem data
       return { ...i, horas: ate === Infinity ? Infinity : Math.max(0, (ate - agora) / 3.6e6) };
     });
   }
@@ -501,11 +500,11 @@
   function abaProgresso() {
     if (!eu) return '';
     const L = eu.level ?? 1, xp = xpDoTreinador(), r = ritmoTreinador();
-    const marcos = [[L + 1, 'próximo nível'], [150, 'Outland, Ginásio e PvP Ranqueado'], [300, 'bosses Regirock e Regice (Mega Stone, peças de TM)'],
-      [500, 'Hoenn e Orre (Z-Move e AoE fazem falta)'], [650, 'bosses Registeel e Kyogre'], [1000, 'Sinnoh e Outland 2 (token 25% mais rápido)'],
-      [2000, 'Outland 3'], [3100, 'bosses Groudon e Rayquaza (1,5% de peça e de Mega)'], [4000, 'Outland 4 (token ×2)'],
-      [5000, 'Unova (fragmento de Ovo Shiny)'], [8000, 'Outland 5'], [9750, 'bosses Uxie e Mesprit'], [10000, 'Kalos'],
-      [16000, 'Outland 6'], [22700, 'bosses Azelf e Dialga'], [25000, 'Alola'], [40000, 'Galar'], [75000, 'Paldea']];
+    const marcos = [[L + 1, 'próximo nível'], [150, 'Outland, Ginásio e PvP Ranqueado'], [300, 'bosses de Kanto: Articuno (peças de Z-Move e AoE), Moltres (Mega), Zapdos (tickets)'],
+      [500, 'Hoenn e Orre (Z-Move e AoE fazem falta)'], [650, 'bosses de Johto: Suicune, Entei e Raikou'], [1000, 'Sinnoh e Outland 2 (token 25% mais rápido)'],
+      [2000, 'Outland 3'], [3100, 'bosses de Hoenn: Groudon, Kyogre e Rayquaza (1,5% de peça e de Mega)'], [4000, 'Outland 4 (token ×2)'],
+      [5000, 'Unova (fragmento de Ovo Shiny)'], [8000, 'Outland 5'], [9750, 'bosses de Sinnoh: Dialga, Palkia e Giratina'], [10000, 'Kalos'],
+      [16000, 'Outland 6'], [22700, 'bosses de Unova: Reshiram, Zekrom e Kyurem'], [25000, 'Alola'], [40000, 'Galar'], [44050, 'bosses de Kalos: Xerneas, Yveltal e Zygarde'], [75000, 'Paldea'], [75900, 'bosses de Alola: Solgaleo, Lunala e Necrozma']];
     const johto = [200, 230, 260, 290, 320, 350, 380, 410, 440, 470].find((t) => t > L);
     if (johto) marcos.push([johto, `próxima faixa de Johto (nv ${johto})`]);
     const lista = marcos.filter(([n]) => n > L).sort((a, b) => a[0] - b[0]).filter((m, i, a) => i === 0 || m[0] !== a[i - 1][0]).slice(0, 7);
@@ -514,8 +513,7 @@
     const linhas = lista.map(([n, nome]) => `<tr><td><b>${num(n)}</b><small>${esc(nome)}</small></td><td>${curto(Math.max(0, xpTotal(n) - xp))}</td><td>${r ? tempo(tempoAte(n)) : '—'}</td></tr>`).join('');
     const pk = pkAtivo();
     return `<div class="oc-linha">Treinador nv <b>${num(L)}</b> com ${curto(xp)} de XP. Ritmo: <b>${r ? `${curto(r.v)}/h` : '—'}</b>${r ? ` <small>(${esc(r.fonte)})</small>` : ''}.${pk ? ` Seu pokémon pode chegar até o nv ${num(L + 5)}.` : ''}</div>
-      ${bt.length ? `<div class="oc-linha">Bônus no ritmo: ${bt.map((b) => `${esc(b.nome)} ×${dec(b.mult, 2)}${b.nome === 'Twitch' ? (prefs.contarLive ? ' (contando a live)' : ' (fora dos tempos: só vale enquanto você assiste)') : Number.isFinite(b.horas) ? ` (acaba em ${tempo(b.horas)})` : ''}`).join(', ')}.
-        <label class="oc-chk" style="margin-left:8px"><input type="checkbox" data-pref="contarLive" ${prefs.contarLive ? 'checked' : ''}> contar a live nos tempos</label></div>` : ''}
+      ${bt.length ? `<div class="oc-linha">Bônus no ritmo: ${bt.map((b) => `${esc(b.nome)} ×${dec(b.mult, 2)}${Number.isFinite(b.horas) ? ` (acaba em ${tempo(b.horas)})` : ''}`).join(', ')}.</div>` : ''}
       <div class="oc-tabela"><table><thead><tr><th>Nível</th><th>XP que falta</th><th>No ritmo atual</th></tr></thead><tbody>${linhas}</tbody></table></div>
       <p class="oc-nota">Cada boost conta só até vencer. Conforme você sobe, abrem hunts melhores e o ritmo cresce, então os tempos longos tendem a ser menores.</p>`;
   }
@@ -1007,7 +1005,7 @@
       <input type="number" step="0.01" min="0" max="10" class="oc-num" data-vd-nota="${esc(r.pid)}" value="${esc(notasDigitadas()[r.pid] ?? '')}" placeholder="${r.n != null ? dec(r.n, 2) : 'ex.: 4,2'}"></label>` : '';
     const tags = [r.sh && '<span class="oc-tag oc-bom">shiny</span>', r.aoe && '<span class="oc-tag">TM AoE</span>', r.el && `<span class="oc-tag">TM ${esc(r.el)}</span>`, r.rf ? `<span class="oc-tag">+${r.rf} refino</span>` : ''].filter(Boolean).join(' ');
     const ouro = res.porMoeda?.find((m) => m.moeda === 'gold');
-    const npc = res.npc ? `No NPC ele vale ${precoTxt(res.npc, 'gold')}${ouro?.opcoes?.justo ? ` (no Mercado em Coins, o preço justo líquido dá ${dec(ouro.liquido(ouro.opcoes.justo) / res.npc, 1)}× isso)` : ''}.` : '';
+    const npc = res.npc ? `No NPC ele vale ${precoTxt(res.npc, 'gold')} pela espécie atual (se ele evoluiu depois de 06/11, o NPC paga pela espécie em que foi capturado, e o jogo não informa qual é)${ouro?.opcoes?.justo ? ` (no Mercado em Coins, o preço justo líquido dá ${dec(ouro.liquido(ouro.opcoes.justo) / res.npc, 1)}× isso)` : ''}.` : '';
     return `<div class="oc-vd">
       <div class="oc-pc-l1"><span><b>${esc(r.apelido || r.nome)}</b>${r.apelido ? ` <small>${esc(r.nome)}</small>` : ''} nv ${num(r.lv)} ${tags}</span></div>
       <div class="oc-pc-l2">P${r.p} · ${notaTxt} · IV ${num(r.iv)} · Q ${dec(r.q, 3)}</div>
@@ -1272,11 +1270,11 @@
     const ctx = { especies: jogo.especies, welcome, eu };
     const mc = analise?.op?.multCaptura || 1;
     const agora = Number(eu?.servidorAgora) || Date.now();
-    // Wiki: o Shiny Secret Lure dobra; o +15% de Secret Lure da Kick multiplica por cima
+    // Wiki: o Shiny Secret Lure dobra; o +15% de Secret Lure da Twitch e o da Kick multiplicam por cima
     const lureLoja = agora < (Number(eu?.loja?.boosts?.shiny) || 0) ? 2 : 1;
-    const lureKick = agora < (Number(eu?.kick?.bonus?.shiny) || 0) ? 1 + (Number(eu?.kick?.pct) || 15) / 100 : 1;
-    const lure = lureLoja * lureKick;
-    const lureTxt = [lureLoja > 1 && 'Secret Lure ×2', lureKick > 1 && `Kick ×${dec(lureKick, 2)}`].filter(Boolean).join(' e ');
+    const lureTw = OC.bonusLive(eu?.twitch, 'shiny', agora), lureKick = OC.bonusLive(eu?.kick, 'shiny', agora);
+    const lure = lureLoja * lureTw * lureKick;
+    const lureTxt = [lureLoja > 1 && 'Secret Lure ×2', lureTw > 1 && `Twitch ×${dec(lureTw, 2)}`, lureKick > 1 && `Kick ×${dec(lureKick, 2)}`].filter(Boolean).join(', ');
     const pShiny = (Number(welcome?.chanceShiny) || 1 / 24000) * lure;
     const temBeast = (OC.estoque?.(eu, 'bola', 5) ?? 0) > 0;
     const bolas = OC.BOLAS.filter((b) => !b.premium || temBeast);
